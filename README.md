@@ -4,7 +4,7 @@
 
 Tuinwijzer is een kleine web-app voor je eigen tuin:
 
-- **💧 Moet ik water geven?** De app berekent een waterbalans: regen minus verdamping van de afgelopen 7 dagen, plus de verwachte regen. Je krijgt advies per zone (gazon, border, moestuin, potten) voor je eigen woonplaats.
+- **💧 Moet ik water geven?** De app berekent een waterbalans: regen minus verdamping van de afgelopen 7 dagen, plus de verwachte regen. Je krijgt advies per zone (gras, border, moestuin, potten) voor je eigen woonplaats.
 - **✂️ Snoeikalender:** kies welke planten je hebt en zie per maand wat je moet snoeien en hoe. Met één klik zet je de herinneringen in je eigen agenda (.ics, werkt met Google, Outlook en Apple).
 
 ## Techniek
