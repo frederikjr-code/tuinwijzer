@@ -2,10 +2,13 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import '@fontsource-variable/bricolage-grotesque/opsz.css'
 import './index.css'
-import App from './App.tsx'
+import App, { type Page } from './App.tsx'
 
-createRoot(document.getElementById('root')!).render(
+const root = document.getElementById('root')!
+const page = (root.dataset.page ?? 'home') as Page
+
+createRoot(root).render(
   <StrictMode>
-    <App />
+    <App page={page} />
   </StrictMode>,
 )

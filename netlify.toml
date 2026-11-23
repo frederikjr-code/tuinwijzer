@@ -1,0 +1,22 @@
+# Directe links naar /snoeikalender en /water werken ook zonder Netlify's "pretty URLs".
+# Elke pagina is een eigen HTML-bestand, dus een catch-all naar index.html is niet nodig.
+[[redirects]]
+  from = "/snoeikalender"
+  to = "/snoeikalender.html"
+  status = 200
+
+[[redirects]]
+  from = "/water"
+  to = "/water.html"
+  status = 200
+
+# Oude of dubbele varianten netjes doorsturen naar de vaste adressen.
+[[redirects]]
+  from = "/snoeikalender/"
+  to = "/snoeikalender"
+  status = 301
+
+[[redirects]]
+  from = "/water/"
+  to = "/water"
+  status = 301

@@ -31,7 +31,14 @@ function mm(v: number, signed = false) {
   return (v > 0 ? '+' : '−') + s;
 }
 
-export default function App() {
+export type Page = 'home' | 'snoeikalender' | 'water';
+
+const NAV: { page: Exclude<Page, 'home'>; href: string; label: string }[] = [
+  { page: 'snoeikalender', href: '/snoeikalender', label: 'Snoeikalender' },
+  { page: 'water', href: '/water', label: 'Water' },
+];
+
+export default function App({ page }: { page: Page }) {
   const [place, setPlace] = useState<Place>(() => load('place', DEFAULT_PLACE));
   const [mine, setMine] = useState<string[]>(() => load('plants', [] as string[]));
 
@@ -41,19 +48,27 @@ export default function App() {
   return (
     <main className="wrap">
       <header className="top">
-        <svg className="logo" viewBox="0 0 32 32" aria-hidden="true">
-          <rect x="10" y="2" width="12" height="28" rx="6" className="logo-tube" />
-          <rect x="10" y="15" width="12" height="15" rx="6" className="logo-water" />
-          <path d="M13 8h3M13 12h3M13 16h3" className="logo-tick" />
-        </svg>
-        <div>
-          <h1>Tuinwijzer</h1>
-          <p>Water geven en snoeien, op het juiste moment.</p>
-        </div>
+        <a className="brand" href="/" aria-label="Tuinwijzer, naar de homepage">
+          <svg className="logo" viewBox="0 0 32 32" aria-hidden="true">
+            <rect x="10" y="2" width="12" height="28" rx="6" className="logo-tube" />
+            <rect x="10" y="15" width="12" height="15" rx="6" className="logo-water" />
+            <path d="M13 8h3M13 12h3M13 16h3" className="logo-tick" />
+          </svg>
+          <div>
+            <h1>Tuinwijzer</h1>
+            <p>Snoeien en water geven, op het juiste moment.</p>
+          </div>
+        </a>
+        <nav className="nav" aria-label="Hoofdmenu">
+          {NAV.map((n) => (
+            <a key={n.page} href={n.href} aria-current={page === n.page ? 'page' : undefined}>{n.label}</a>
+          ))}
+        </nav>
       </header>
 
-      <Water place={place} setPlace={setPlace} />
-      <Pruning mine={mine} setMine={setMine} />
+      {page === 'water' && <Water place={place} setPlace={setPlace} />}
+      {page !== 'water' && <Pruning mine={mine} setMine={setMine} />}
+      {page === 'home' && <WaterTeaser place={place} />}
 
       <footer>
         <p>
@@ -70,6 +85,20 @@ export default function App() {
         <p>Gebouwd door Frederik Vermeulen en gevibecodet met Claude.</p>
       </footer>
     </main>
+  );
+}
+
+/** Kleine doorverwijzing op de homepage naar het beregeningsadvies. */
+function WaterTeaser({ place }: { place: Place }) {
+  return (
+    <aside className="section teaser" aria-labelledby="teaser-h">
+      <svg viewBox="0 0 16 16" aria-hidden="true" className="ico"><path d="M8 2.5s4 4.3 4 7.2a4 4 0 0 1-8 0C4 6.8 8 2.5 8 2.5Z" /></svg>
+      <div>
+        <h2 id="teaser-h">Moet ik water geven?</h2>
+        <p className="muted">Wateradvies per zone op basis van regen en verdamping in {place.name}.</p>
+      </div>
+      <a className="chip" href="/water">Bekijk het wateradvies <span aria-hidden="true">→</span></a>
+    </aside>
   );
 }
 
