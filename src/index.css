@@ -1,26 +1,48 @@
 :root {
-  --bg: #f4f1ea;
-  --card: #fffdf8;
-  --ink: #1f2a1f;
-  --muted: #6b7466;
-  --line: #e4dfd3;
-  --green: #2f6b3a;
-  --green-soft: #e3efdf;
-  --amber: #b7791f;
-  --amber-soft: #fbefd9;
-  --red: #b4432f;
-  --red-soft: #f8e1db;
-  --blue: #3b7bbf;
-  --blue-soft: #e1ecf7;
-  --rain: #4a8fd6;
-  --evap: #e0a84a;
-  font-family: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  /* palet: "de regenmeter" */
+  --bg: #eef1ec;
+  --ink: #14302a;
+  --muted: #4c5f59; /* 5,7:1 op --bg */
+  --line: #cdd5cf;
+  --line-strong: #9fada6;
+  --surface: #f8faf7; /* invoervelden en chips */
+
+  --rain: #3a7ca5;
+  --good: #8db33a;
+  --water: #c8902e;
+  --frost: #bfd9e8;
+  --evap: #c8902e;
+
+  /* seizoenstint voor de snoeikalender */
+  --tint-w: rgb(58 124 165 / 0.08);
+  --tint-l: rgb(141 179 58 / 0.11);
+  --tint-z: rgb(226 178 60 / 0.12);
+  --tint-h: rgb(176 112 36 / 0.10);
+
+  --r-lg: 22px; /* hero */
+  --r-md: 12px; /* knoppen, popover */
+  --r-sm: 6px; /* kalender, kleine vlakken */
+
+  --font: 'Bricolage Grotesque Variable', ui-sans-serif, system-ui, sans-serif;
+
+  color-scheme: light;
+  font-family: var(--font);
+  font-optical-sizing: auto;
+  font-variant-numeric: tabular-nums;
   color: var(--ink);
   background: var(--bg);
   -webkit-font-smoothing: antialiased;
+  line-height: 1.45;
 }
 
 * { box-sizing: border-box; }
-body { margin: 0; }
+body { margin: 0; background: var(--bg); }
 button, input { font: inherit; color: inherit; }
-a { color: var(--green); }
+a { color: var(--ink); text-underline-offset: 3px; text-decoration-thickness: 1px; }
+a:hover { text-decoration-thickness: 2px; }
+
+:focus-visible { outline: 3px solid var(--rain); outline-offset: 2px; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}

@@ -1,7 +1,10 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import './App.css';
 import { MONTHS, MONTHS_LONG, PLANTS, type Plant, buildIcs } from './plants';
-import { type Day, DEFAULT_PLACE, type Place, fetchWeather, searchPlace, waterAdvice } from './weather';
+import {
+  type Day, DEFAULT_PLACE, GIETER_LITER, type Place, SLANG_LITER_PER_MIN, type Status, type WaterUnit,
+  fetchWeather, searchPlace, waterAdvice,
+} from './weather';
 
 function load<T>(key: string, fallback: T): T {
   try {
@@ -19,6 +22,14 @@ function save(key: string, value: unknown) {
   }
 }
 
+const nf = new Intl.NumberFormat('nl-NL', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+/** Millimeters met één decimaal, komma en een echt minteken. */
+function mm(v: number, signed = false) {
+  const s = nf.format(Math.abs(v));
+  if (!signed || Math.abs(v) < 0.05) return s;
+  return (v > 0 ? '+' : '−') + s;
+}
+
 export default function App() {
   const [place, setPlace] = useState<Place>(() => load('place', DEFAULT_PLACE));
   const [mine, setMine] = useState<string[]>(() => load('plants', [] as string[]));
@@ -29,7 +40,11 @@ export default function App() {
   return (
     <main className="wrap">
       <header className="top">
-        <div className="logo">🌱</div>
+        <svg className="logo" viewBox="0 0 32 32" aria-hidden="true">
+          <rect x="10" y="2" width="12" height="28" rx="6" className="logo-tube" />
+          <rect x="10" y="15" width="12" height="15" rx="6" className="logo-water" />
+          <path d="M13 8h3M13 12h3M13 16h3" className="logo-tick" />
+        </svg>
         <div>
           <h1>Tuinwijzer</h1>
           <p>Water geven en snoeien, op het juiste moment.</p>
@@ -40,16 +55,29 @@ export default function App() {
       <Pruning mine={mine} setMine={setMine} />
 
       <footer>
-        Weerdata via <a href="https://open-meteo.com" target="_blank" rel="noreferrer">Open-Meteo</a>. Snoeiadvies is een
-        algemene richtlijn, per soort en ras kan het afwijken. Je keuzes worden alleen in je eigen browser bewaard.
-        <br />
-        Gebouwd door Frederik Vermeulen · gevibecodet met Claude
+        <p>
+          Weerdata via <a href="https://open-meteo.com" target="_blank" rel="noreferrer">Open-Meteo</a>. Snoeiadvies is een
+          algemene richtlijn, per soort en ras kan het afwijken. Je keuzes worden alleen in je eigen browser bewaard.
+        </p>
+        <p>Gebouwd door Frederik Vermeulen en gevibecodet met Claude.</p>
       </footer>
     </main>
   );
 }
 
 /* ---------------- Wateradvies ---------------- */
+
+function explain(status: Status, balance: number, rain48: number) {
+  if (status === 'frost') return 'Er wordt binnen drie dagen vorst verwacht, en natte grond en potten bevriezen dan sneller.';
+  const past =
+    balance <= -0.5
+      ? `De afgelopen week verdampte er ${mm(-balance)} mm meer dan er viel`
+      : balance >= 0.5
+        ? `De afgelopen week viel er ${mm(balance)} mm meer regen dan er verdampte`
+        : 'Regen en verdamping hielden elkaar de afgelopen week in evenwicht';
+  const next = rain48 >= 0.5 ? `de komende twee dagen valt naar verwachting ${mm(rain48)} mm` : 'de komende twee dagen blijft het naar verwachting droog';
+  return `${past}, en ${next}.`;
+}
 
 function Water({ place, setPlace }: { place: Place; setPlace: (p: Place) => void }) {
   const [days, setDays] = useState<Day[] | null>(null);
@@ -62,49 +90,115 @@ function Water({ place, setPlace }: { place: Place; setPlace: (p: Place) => void
     (demo ? Promise.resolve(demoWeather()) : fetchWeather(place)).then(setDays).catch((e: Error) => setError(e.message));
   }, [place]);
 
-  const result = useMemo(() => (days ? waterAdvice(days) : null), [days]);
+  const [unit, setUnit] = useState<WaterUnit>(() => load('unit', 'gieter' as WaterUnit));
+  useEffect(() => save('unit', unit), [unit]);
+  const result = useMemo(() => (days ? waterAdvice(days, unit) : null), [days, unit]);
   const worst = result?.advice.find((a) => a.status === 'water') ?? result?.advice.find((a) => a.status === 'frost') ?? result?.advice.find((a) => a.status === 'soon');
+  const status: Status = worst?.status ?? 'ok';
   const headline = !result
     ? ''
-    : worst?.status === 'water'
+    : status === 'water'
       ? 'Vandaag water geven'
-      : worst?.status === 'frost'
+      : status === 'frost'
         ? 'Geen water geven: vorst op komst'
-        : worst?.status === 'soon'
+        : status === 'soon'
           ? 'Nog niet, maar het wordt droger'
           : 'Geen water nodig';
 
   return (
-    <section className="card">
-      <div className="cardhead">
-        <h2>💧 Moet ik water geven?</h2>
+    <section className="section" aria-labelledby="water-h">
+      <div className="sechead">
+        <h2 id="water-h">Moet ik water geven?</h2>
         <PlacePicker place={place} setPlace={setPlace} />
       </div>
 
       {error && <p className="notice">Het weer kon niet worden opgehaald: {error}</p>}
-      {!error && !result && <p className="muted">Weer ophalen…</p>}
+      {!error && !result && <p className="muted loading">Het weer wordt opgehaald…</p>}
 
       {result && days && (
         <>
-          <div className={`headline ${worst?.status ?? 'ok'}`}>
-            <span className="big">{headline}</span>
-            <span className="sub">
-              Waterbalans afgelopen 7 dagen: <b>{result.balance > 0 ? '+' : ''}{result.balance.toFixed(1)} mm</b>
-              {' · '}verwachte regen komende 48 uur: <b>{result.rain48.toFixed(1)} mm</b>
-            </span>
+          <div className="hero">
+            <div className="hero-text">
+              <span className={`hero-mark ${status}`} aria-hidden="true" />
+              <p className="hero-big">{headline}</p>
+              <p className="hero-sub">{explain(status, result.balance, result.rain48)}</p>
+            </div>
+            <RainGauge value={result.balance} />
           </div>
-          <div className="zones">
+
+          <div className="subhead">
+            <h3>Wateradvies per zone</h3>
+            <div className="seg" role="group" aria-label="Ik geef water met">
+              <button aria-pressed={unit === 'gieter'} onClick={() => setUnit('gieter')}>Gieter</button>
+              <button aria-pressed={unit === 'slang'} onClick={() => setUnit('slang')}>Tuinslang</button>
+            </div>
+          </div>
+          <ul className="zones">
             {result.advice.map((a) => (
-              <div key={a.zone} className={`zone ${a.status}`}>
-                <div className="zhead"><span>{a.icon}</span><b>{a.zone}</b><span className={`dot ${a.status}`} /></div>
-                <p>{a.text}</p>
-              </div>
+              <li key={a.zone} className="zone">
+                <span className={`stripe ${a.status}`} aria-hidden="true" />
+                <div className="zbody">
+                  <b className="zname">{a.zone}</b>
+                  <p>{a.text}</p>
+                </div>
+              </li>
             ))}
-          </div>
+          </ul>
+          <p className="muted small">
+            {unit === 'gieter'
+              ? `Uitgaande van een gieter van ${GIETER_LITER} liter.`
+              : `Uitgaande van een tuinslang met sproeikop, die ongeveer ${SLANG_LITER_PER_MIN} liter per minuut geeft.`}
+          </p>
+
+          <h3>Regen en verdamping per dag</h3>
           <RainChart days={days} />
         </>
       )}
     </section>
+  );
+}
+
+/** Verticale regenmeter: −30 tot +30 mm, 0 in het midden. */
+function RainGauge({ value }: { value: number }) {
+  const W = 150, H = 300, top = 14, bottom = 286, tx = 52, tw = 40;
+  const y = (v: number) => top + ((30 - Math.max(-30, Math.min(30, v))) / 60) * (bottom - top);
+  const level = y(value);
+  const labelY = Math.max(top + 12, Math.min(bottom - 6, level + 6));
+  const ticks = Array.from({ length: 13 }, (_, i) => 30 - i * 5);
+
+  return (
+    <figure className="gauge">
+      <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label={`Waterbalans afgelopen 7 dagen: ${mm(value, true)} mm`}>
+        <defs>
+          <clipPath id="tube-clip">
+            <rect x={tx} y={top} width={tw} height={bottom - top} rx={tw / 2} />
+          </clipPath>
+        </defs>
+        {ticks.map((t) => (
+          <g key={t}>
+            <line x1={t % 10 === 0 ? tx - 14 : tx - 8} x2={tx - 2} y1={y(t)} y2={y(t)} className={`gtick ${t === 0 ? 'zero' : ''}`} />
+            {t % 10 === 0 && (
+              <text x={tx - 18} y={y(t) + 4} textAnchor="end" className={`glabel ${t === 0 ? 'zero' : ''}`}>
+                {t > 0 ? `+${t}` : t < 0 ? `−${-t}` : '0'}
+              </text>
+            )}
+          </g>
+        ))}
+        <rect x={tx} y={top} width={tw} height={bottom - top} rx={tw / 2} className="tube" />
+        <g clipPath="url(#tube-clip)">
+          <g className="gfill">
+            <rect x={tx} y={level} width={tw} height={bottom - level + 1} className="water" />
+            <rect x={tx} y={level} width={tw} height={3} className="surface" />
+          </g>
+          <line x1={tx + 9} x2={tx + 9} y1={top + 16} y2={bottom - 16} className="glare" />
+        </g>
+        <rect x={tx} y={top} width={tw} height={bottom - top} rx={tw / 2} className="tube-edge" />
+        <line x1={tx} x2={tx + tw} y1={y(0)} y2={y(0)} className="gzero" />
+        <text x={tx + tw + 8} y={labelY} className="gvalue">{mm(value, true)}</text>
+        <text x={tx + tw + 8} y={labelY + 16} className="gunit">mm</text>
+      </svg>
+      <figcaption>Waterbalans van de afgelopen 7 dagen</figcaption>
+    </figure>
   );
 }
 
@@ -133,14 +227,18 @@ function PlacePicker({ place, setPlace }: { place: Place; setPlace: (p: Place) =
 
   return (
     <div className="place">
-      <button className="chip" onClick={() => setOpen(!open)}>📍 {place.name} ▾</button>
+      <button className="chip" aria-expanded={open} onClick={() => setOpen(!open)}>
+        <svg viewBox="0 0 16 16" aria-hidden="true" className="ico"><path d="M8 15s5-4.6 5-8.5A5 5 0 0 0 3 6.5C3 10.4 8 15 8 15Z" /><circle cx="8" cy="6.5" r="1.8" /></svg>
+        {place.name}
+        <svg viewBox="0 0 16 16" aria-hidden="true" className="ico chev"><path d="m4 6 4 4 4-4" /></svg>
+      </button>
       {open && (
         <div className="popover">
-          <input autoFocus placeholder="Zoek je woonplaats…" value={q} onChange={(e) => setQ(e.target.value)} />
+          <input autoFocus aria-label="Woonplaats" placeholder="Zoek je woonplaats…" value={q} onChange={(e) => setQ(e.target.value)} />
           {hits.map((h) => (
             <button key={`${h.lat},${h.lon}`} className="hit" onClick={() => choose(h)}>{h.name}</button>
           ))}
-          <button className="hit locate" onClick={locate}>🎯 Gebruik mijn huidige locatie</button>
+          <button className="hit locate" onClick={locate}>Gebruik mijn huidige locatie</button>
         </div>
       )}
     </div>
@@ -153,8 +251,23 @@ function niceStep(x: number) {
   return [1, 2, 5, 10].map((m) => m * pow).find((s) => s >= x)!;
 }
 
+/** Breedte van een element in px, zodat de grafiek op elk scherm leesbare letters houdt. */
+function useWidth<T extends HTMLElement>(fallback: number) {
+  const ref = useRef<T>(null);
+  const [w, setW] = useState(fallback);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const ro = new ResizeObserver(([e]) => setW(Math.round(e.contentRect.width)));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  return [ref, w] as const;
+}
+
 function RainChart({ days }: { days: Day[] }) {
-  const W = 700, H = 170, padL = 30, padB = 34, padT = 10;
+  const [ref, width] = useWidth<HTMLDivElement>(700);
+  const W = Math.max(280, width), H = 180, padL = 26, padB = 36, padT = 8;
   const dataMax = Math.max(4, ...days.map((d) => Math.max(d.rain, d.et0)));
   const step = niceStep(dataMax / 3);
   const max = Math.ceil((dataMax * 1.05) / step) * step;
@@ -165,34 +278,37 @@ function RainChart({ days }: { days: Day[] }) {
   const fmt = (s: string) => new Intl.DateTimeFormat('nl-NL', { weekday: 'short', day: 'numeric' }).format(new Date(s + 'T12:00:00'));
 
   return (
-    <div className="chart">
-      <div className="legend"><span className="lg rain" /> Regen (mm) <span className="lg evap" /> Verdamping (mm)</div>
-      <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label="Regen en verdamping per dag">
+    <div className="chart" ref={ref}>
+      <div className="legend"><span className="lg rain" /> Regen <span className="lg evap" /> Verdamping <span className="muted">(in mm)</span></div>
+      <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} role="img" aria-label="Regen en verdamping per dag">
         {todayIdx > 0 && <rect x={padL + todayIdx * bw} y={padT} width={W - padL - todayIdx * bw} height={H - padT - padB} className="future" />}
         {ticks.map((t) => (
           <g key={t}>
-            <line x1={padL} x2={W} y1={y(t)} y2={y(t)} className="grid" />
-            <text x={padL - 5} y={y(t) + 4} className="axis" textAnchor="end">{t.toFixed(0)}</text>
+            <line x1={padL} x2={W} y1={y(t)} y2={y(t)} className={`grid ${t === 0 ? 'base' : ''}`} />
+            <text x={padL - 6} y={y(t) + 4} className="axis" textAnchor="end">{t.toFixed(0)}</text>
           </g>
         ))}
         {days.map((d, i) => {
           const x = padL + i * bw;
+          const [wd, dn] = fmt(d.date).split(' ');
           return (
             <g key={d.date}>
-              <rect x={x + bw * 0.14} width={bw * 0.36} y={y(d.rain)} height={y(0) - y(d.rain)} rx={2} className="rain"><title>{`${fmt(d.date)}: ${d.rain.toFixed(1)} mm regen`}</title></rect>
-              <rect x={x + bw * 0.52} width={bw * 0.34} y={y(d.et0)} height={y(0) - y(d.et0)} rx={2} className="evap"><title>{`${fmt(d.date)}: ${d.et0.toFixed(1)} mm verdamping`}</title></rect>
-              <text x={x + bw / 2} y={H - 18} className={`axis ${i === todayIdx ? 'today' : ''}`} textAnchor="middle">{fmt(d.date).split(' ')[0]}</text>
-              <text x={x + bw / 2} y={H - 5} className={`axis ${i === todayIdx ? 'today' : ''}`} textAnchor="middle">{fmt(d.date).split(' ')[1]}</text>
+              <rect x={x + bw * 0.16} width={bw * 0.32} y={y(d.rain)} height={y(0) - y(d.rain)} rx={Math.min(2, bw * 0.08)} className="rain"><title>{`${fmt(d.date)}: ${mm(d.rain)} mm regen`}</title></rect>
+              <rect x={x + bw * 0.52} width={bw * 0.32} y={y(d.et0)} height={y(0) - y(d.et0)} rx={Math.min(2, bw * 0.08)} className="evap"><title>{`${fmt(d.date)}: ${mm(d.et0)} mm verdamping`}</title></rect>
+              <text x={x + bw / 2} y={H - 20} className={`axis ${i === todayIdx ? 'today' : ''}`} textAnchor="middle">{wd}</text>
+              <text x={x + bw / 2} y={H - 6} className={`axis ${i === todayIdx ? 'today' : ''}`} textAnchor="middle">{dn}</text>
             </g>
           );
         })}
       </svg>
-      <div className="muted small">Afgelopen week links, verwachting rechts (lichter vlak).</div>
+      <p className="muted small">Links zie je de afgelopen week, rechts in het lichtere vlak de verwachting.</p>
     </div>
   );
 }
 
 /* ---------------- Snoeikalender ---------------- */
+
+const SEASON = ['w', 'w', 'l', 'l', 'l', 'z', 'z', 'z', 'h', 'h', 'h', 'w'];
 
 function Pruning({ mine, setMine }: { mine: string[]; setMine: (ids: string[]) => void }) {
   const [picking, setPicking] = useState(mine.length === 0);
@@ -212,10 +328,10 @@ function Pruning({ mine, setMine }: { mine: string[]; setMine: (ids: string[]) =
   };
 
   return (
-    <section className="card">
-      <div className="cardhead">
-        <h2>✂️ Snoeikalender</h2>
-        <button className="chip" onClick={() => setPicking(!picking)}>{picking ? 'Klaar' : `Mijn planten (${mine.length}) ✎`}</button>
+    <section className="section prune" aria-labelledby="prune-h">
+      <div className="sechead">
+        <h2 id="prune-h">Snoeikalender</h2>
+        <button className="chip" onClick={() => setPicking(!picking)}>{picking ? 'Klaar' : `Mijn planten (${mine.length}) aanpassen`}</button>
       </div>
 
       {picking && <PlantPicker mine={mine} setMine={setMine} />}
@@ -224,50 +340,97 @@ function Pruning({ mine, setMine }: { mine: string[]; setMine: (ids: string[]) =
 
       {!picking && plants.length > 0 && (
         <>
-          <div className="now">
-            <h3>Deze maand ({MONTHS_LONG[month - 1]})</h3>
-            {nowList.length === 0 ? (
-              <p className="muted">Niets te snoeien. Even genieten van de tuin.</p>
-            ) : (
-              nowList.map((p) => <PlantTip key={p.id} p={p} />)
-            )}
-            {nextList.length > 0 && (
-              <>
-                <h3 className="nexth">Volgende maand ({MONTHS_LONG[next - 1]})</h3>
-                {nextList.map((p) => <PlantTip key={p.id} p={p} />)}
-              </>
-            )}
-          </div>
+          <h3>Deze maand ({MONTHS_LONG[month - 1]})</h3>
+          {nowList.length === 0 ? (
+            <p className="muted">Niets te snoeien. Even genieten van de tuin.</p>
+          ) : (
+            <ul className="tips">{nowList.map((p) => <PlantTip key={p.id} p={p} />)}</ul>
+          )}
+          {nextList.length > 0 && (
+            <>
+              <h3>Volgende maand ({MONTHS_LONG[next - 1]})</h3>
+              <ul className="tips later">{nextList.map((p) => <PlantTip key={p.id} p={p} />)}</ul>
+            </>
+          )}
 
-          <div className="grid12">
-            <div className="row head">
-              <span />
-              {MONTHS.map((m, i) => <span key={m} className={i + 1 === month ? 'cur' : ''}>{m}</span>)}
-            </div>
-            {plants.map((p) => (
-              <div className="row" key={p.id} title={p.tip}>
-                <span className="pname">{p.name}</span>
-                {MONTHS.map((m, i) => (
-                  <span key={m} className={`cell ${i + 1 === month ? 'cur' : ''}`}>{p.months.includes(i + 1) ? <i className="cut" /> : null}</span>
-                ))}
-              </div>
-            ))}
-          </div>
+          <h3>Het hele jaar</h3>
+          <YearGrid plants={plants} month={month} />
 
-          <button className="btn" onClick={download}>📅 Zet in mijn agenda (.ics)</button>
-          <p className="muted small">Werkt met Google Agenda, Outlook en Apple Agenda. Herinneringen herhalen elk jaar op de 1e van de snoeimaand.</p>
+          <div className="actions">
+            <button className="btn" onClick={() => window.print()}>Printen voor in de schuur</button>
+            <button className="btn ghost" onClick={download}>Zet in mijn agenda (.ics)</button>
+          </div>
+          <p className="muted small">
+            De print past op één A4 liggend, met per plant wanneer en hoe je snoeit. De agenda werkt met Google Agenda, Outlook
+            en Apple Agenda, en de herinneringen herhalen elk jaar op de 1e van de snoeimaand.
+          </p>
         </>
       )}
+
+      {plants.length > 0 && <PrintPoster plants={plants} />}
     </section>
+  );
+}
+
+/** Jaaroverzicht: maandkolommen met seizoenstint. Zonder `month` geen markering (voor de print). */
+function YearGrid({ plants, month }: { plants: Plant[]; month?: number }) {
+  const cls = (i: number) => `s-${SEASON[i]}${i + 1 === month ? ' cur' : ''}`;
+  return (
+    <div className="grid12" tabIndex={0} aria-label="Snoeimaanden per plant">
+      <div className="row head">
+        <span className="pname" />
+        {MONTHS.map((m, i) => <span key={m} className={cls(i)} aria-current={i + 1 === month ? 'date' : undefined}>{m}</span>)}
+      </div>
+      {plants.map((p) => (
+        <div className="row" key={p.id} title={p.tip}>
+          <span className="pname">{p.name}</span>
+          {MONTHS.map((m, i) => (
+            <span key={m} className={cls(i)}>
+              {p.months.includes(i + 1) ? <i className="cut" aria-label={`snoeien in ${MONTHS_LONG[i]}`} /> : null}
+            </span>
+          ))}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/** "maart, april en mei" */
+function joinNl(items: string[]) {
+  return items.length < 2 ? items.join('') : `${items.slice(0, -1).join(', ')} en ${items[items.length - 1]}`;
+}
+
+/** Alleen zichtbaar bij afdrukken: een poster om in de schuur of garage op te hangen. */
+function PrintPoster({ plants }: { plants: Plant[] }) {
+  return (
+    <div className="poster" aria-hidden="true">
+      <div className="poster-head">
+        <h2>Snoeikalender</h2>
+        <p>Een vakje betekent: deze maand snoeien.</p>
+      </div>
+      <YearGrid plants={plants} />
+      <ol className="poster-tips">
+        {plants.map((p) => (
+          <li key={p.id}>
+            <b>{p.name}</b> <span className="when">snoeien in {joinNl(p.months.map((m) => MONTHS_LONG[m - 1]))}</span>
+            <p>{p.tip}</p>
+          </li>
+        ))}
+      </ol>
+      <p className="poster-foot">Gemaakt met Tuinwijzer. Snoeiadvies is een algemene richtlijn, per soort en ras kan het afwijken.</p>
+    </div>
   );
 }
 
 function PlantTip({ p }: { p: Plant }) {
   return (
-    <div className="tip">
-      <b>{p.name}</b>
-      <p>{p.tip}</p>
-    </div>
+    <li className="tip">
+      <span className="stripe ok" aria-hidden="true" />
+      <div>
+        <b>{p.name}</b>
+        <p>{p.tip}</p>
+      </div>
+    </li>
   );
 }
 
@@ -279,7 +442,7 @@ function PlantPicker({ mine, setMine }: { mine: string[]; setMine: (ids: string[
 
   return (
     <div className="picker">
-      <input placeholder="Zoek een plant…" value={q} onChange={(e) => setQ(e.target.value)} />
+      <input aria-label="Zoek een plant" placeholder="Zoek een plant…" value={q} onChange={(e) => setQ(e.target.value)} />
       {groups.map((g) => {
         const list = PLANTS.filter((p) => p.group === g && match(p));
         if (list.length === 0) return null;
@@ -288,7 +451,7 @@ function PlantPicker({ mine, setMine }: { mine: string[]; setMine: (ids: string[
             <h4>{g}</h4>
             <div className="chips">
               {list.map((p) => (
-                <button key={p.id} className={`pchip ${mine.includes(p.id) ? 'on' : ''}`} onClick={() => toggle(p.id)}>
+                <button key={p.id} className={`pchip ${mine.includes(p.id) ? 'on' : ''}`} aria-pressed={mine.includes(p.id)} onClick={() => toggle(p.id)}>
                   {mine.includes(p.id) ? '✓ ' : '+ '}{p.name}
                 </button>
               ))}
