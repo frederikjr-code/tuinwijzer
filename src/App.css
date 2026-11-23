@@ -1,4 +1,5 @@
-.wrap { max-width: 880px; margin: 0 auto; padding: 32px 24px 56px; }
+/* onderaan extra ruimte (minstens 80 px) zodat de Netlify-badge niets bedekt */
+.wrap { max-width: 880px; margin: 0 auto; padding: 32px 24px 150px; }
 
 /* ---------- kop ---------- */
 .top { display: flex; align-items: center; gap: 12px; margin-bottom: 48px; }
@@ -12,7 +13,9 @@
 /* ---------- secties: witruimte + kop, geen kaders ---------- */
 .section + .section { margin-top: 72px; }
 .sechead { display: flex; justify-content: space-between; align-items: center; gap: 12px 16px; flex-wrap: wrap; margin-bottom: 20px; }
-h2 { margin: 0; font-size: clamp(28px, 5vw, 36px); font-weight: 700; letter-spacing: -0.035em; line-height: 1.05; }
+/* sectiekoppen: een rustige aanloopregel, het antwoord eronder is het grote element */
+h2 { margin: 0; font-size: 20px; font-weight: 650; letter-spacing: -0.01em; line-height: 1.2; }
+.lead { font-size: 17px; margin-bottom: 14px; }
 h3 { margin: 40px 0 12px; font-size: 19px; font-weight: 650; letter-spacing: -0.02em; }
 h4 { margin: 20px 0 8px; font-size: 15px; font-weight: 600; color: var(--muted); }
 p { margin: 0; }
@@ -28,6 +31,9 @@ p { margin: 0; }
   padding: 7px 14px; min-height: 40px; cursor: pointer; font-size: 15px;
 }
 .chip:hover { border-color: var(--ink); }
+.chip.primary { background: var(--ink); border-color: var(--ink); color: #fff; font-weight: 600; }
+.chip.primary:hover { background: #1f4a40; }
+.chip:disabled { opacity: 0.45; cursor: not-allowed; }
 .ico { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
 .chev { width: 14px; height: 14px; }
 .btn {
@@ -57,17 +63,21 @@ p { margin: 0; }
   display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 24px 40px;
   background: rgb(255 255 255 / 0.55); border-radius: var(--r-lg); padding: 32px 32px 24px 36px;
 }
-.hero-mark { display: block; width: 44px; height: 6px; border-radius: 3px; margin-bottom: 18px; }
-.hero-big { font-size: clamp(38px, 7.2vw, 62px); font-weight: 750; letter-spacing: -0.045em; line-height: 0.98; text-wrap: balance; }
+.hero-big { font-size: clamp(38px, 7.2vw, 62px); font-weight: 750; letter-spacing: -0.02em; line-height: 1.05; text-wrap: balance; }
 .hero-sub { margin-top: 16px; font-size: 18px; line-height: 1.45; color: var(--muted); max-width: 34ch; text-wrap: pretty; }
 
 .gauge { margin: 0; display: flex; flex-direction: column; align-items: center; }
-.gauge svg { width: 150px; height: auto; display: block; overflow: visible; }
-.gauge figcaption { font-size: 13px; color: var(--muted); text-align: center; max-width: 16ch; line-height: 1.3; margin-top: 6px; }
+.gauge svg { width: 170px; height: auto; display: block; overflow: visible; }
+.gauge figcaption strong { display: block; margin-top: 2px; color: var(--ink); font-weight: 600; }
+.gauge figcaption { font-size: 13px; color: var(--muted); text-align: center; max-width: 18ch; line-height: 1.3; margin-top: 6px; }
 .tube { fill: rgb(255 255 255 / 0.5); }
 .tube-edge { fill: none; stroke: rgb(20 48 42 / 0.45); stroke-width: 1.5; }
 .water { fill: var(--rain); fill-opacity: 0.88; }
 .surface { fill: #8fbcd8; }
+.stream { fill: none; stroke: var(--rain); stroke-width: 4; stroke-linecap: round; opacity: 0.88; }
+.drop { fill: var(--rain); opacity: 0.88; }
+.dry-bed { fill: var(--water); opacity: 0.45; }
+.dry-crack { fill: none; stroke: var(--water-text); stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
 .glare { stroke: rgb(255 255 255 / 0.6); stroke-width: 3; stroke-linecap: round; }
 .gtick { stroke: var(--muted); stroke-width: 1.2; }
 .gtick.zero, .gzero { stroke: var(--ink); stroke-width: 1.8; }
@@ -78,18 +88,27 @@ p { margin: 0; }
 .gunit { font-size: 13px; fill: var(--muted); }
 
 /* de buis vult zich één keer bij het laden */
-.gfill { transform-box: view-box; transform-origin: 0 286px; animation: fill-up 1.4s cubic-bezier(.2,.7,.2,1) both; }
+.gfill { transform-box: view-box; transform-origin: 0 296px; animation: fill-up 1.4s cubic-bezier(.2,.7,.2,1) both; }
 .gvalue, .gunit { animation: fade-in .5s ease-out 1s both; }
+.gover, .gdry { animation: fade-in .4s ease-out 1.2s both; }
+.gover .drop { animation: drip .9s ease-in 1.5s both; }
+.gover .d2 { animation-delay: 1.75s; }
+@keyframes drip { from { opacity: 0; transform: translateY(-14px); } }
 @keyframes fill-up { from { transform: scaleY(0); } }
 @keyframes fade-in { from { opacity: 0; } }
 
-/* ---------- statusstreepjes ---------- */
+/* ---------- statusstreepjes: minstens 3:1 contrast op de achtergrond ---------- */
 .stripe { width: 6px; flex: none; border-radius: 3px; align-self: stretch; }
-.ok { background: var(--good); }
-.water.stripe, .hero-mark.water { background: var(--water); }
-.soon { background: repeating-linear-gradient(180deg, var(--water) 0 6px, rgb(200 144 46 / 0.35) 6px 10px); }
-.hero-mark.soon { background: repeating-linear-gradient(90deg, var(--water) 0 8px, rgb(200 144 46 / 0.35) 8px 12px); }
-.frost { background: var(--frost); box-shadow: inset 0 0 0 1px rgb(58 124 165 / 0.45); }
+.stripe.ok { background: var(--good-strong); }
+.stripe.water { background: var(--water-strong); }
+.stripe.soon { background: repeating-linear-gradient(180deg, var(--water-strong) 0 6px, transparent 6px 9px); box-shadow: inset 0 0 0 1px var(--water-strong); }
+.stripe.frost { background: var(--frost-strong); }
+
+/* statuswoord: donkere varianten voor tekstcontrast (≥ 4,5:1) */
+.zstatus { font-size: 14px; font-weight: 600; }
+.zstatus.ok { color: var(--good-text); }
+.zstatus.water, .zstatus.soon { color: var(--water-text); }
+.zstatus.frost { color: var(--frost-text); }
 
 /* ---------- keuze gieter / tuinslang ---------- */
 .subhead { display: flex; justify-content: space-between; align-items: center; gap: 10px 16px; flex-wrap: wrap; margin: 40px 0 12px; }
@@ -104,6 +123,7 @@ p { margin: 0; }
 .zone, .tip { display: flex; gap: 16px; padding: 14px 0; border-top: 1px solid var(--line); }
 .zone:last-child, .tip:last-child { border-bottom: 1px solid var(--line); }
 .zbody { display: grid; grid-template-columns: 11rem 1fr; gap: 4px 16px; flex: 1; }
+.zhead { display: flex; flex-direction: column; gap: 1px; }
 .zname { font-weight: 650; }
 .zone p, .tip p { line-height: 1.45; }
 .tip p { color: var(--muted); margin-top: 2px; }
@@ -120,7 +140,9 @@ p { margin: 0; }
 .grid.base { stroke: var(--line-strong); }
 .axis { font-size: 12px; fill: var(--muted); }
 .axis.today { fill: var(--ink); font-weight: 700; }
-.future { fill: rgb(255 255 255 / 0.5); }
+.future { fill: rgb(58 124 165 / 0.08); }
+.today-mark line { stroke: var(--ink); stroke-width: 1; stroke-dasharray: 2 3; }
+.today-mark text { font-size: 12px; font-weight: 600; fill: var(--ink); }
 
 /* ---------- snoeikalender ---------- */
 .grid12 { overflow-x: auto; margin: 0 -4px; padding: 0 4px 4px; }
@@ -186,15 +208,16 @@ footer { color: var(--muted); font-size: 14px; line-height: 1.6; margin-top: 80p
 
 /* ---------- smal scherm ---------- */
 @media (max-width: 640px) {
-  .wrap { padding: 20px 16px 40px; }
+  .wrap { padding: 20px 16px 130px; }
   .top { margin-bottom: 36px; }
   .section + .section { margin-top: 56px; }
   .hero { grid-template-columns: 1fr; padding: 24px 20px; gap: 16px; }
   .gauge { order: -1; flex-direction: row; gap: 12px; align-items: center; justify-content: flex-start; }
-  .gauge svg { width: 110px; }
+  .gauge svg { width: 125px; }
   .gauge figcaption { text-align: left; }
   .hero-sub { font-size: 17px; }
   .zbody { grid-template-columns: 1fr; }
+  .zhead { flex-direction: row; align-items: baseline; gap: 10px; }
   .popover { right: auto; left: 0; }
   h3 { margin-top: 32px; }
 }

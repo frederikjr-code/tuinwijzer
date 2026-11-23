@@ -13,6 +13,14 @@
   --frost: #bfd9e8;
   --evap: #c8902e;
 
+  /* sterkere varianten: streepjes (≥ 3:1) en tekst (≥ 4,5:1) op --bg */
+  --good-strong: #67951c;
+  --water-strong: #a87420;
+  --frost-strong: #5089b2;
+  --good-text: #4a6e12;
+  --water-text: #8a5a10;
+  --frost-text: #2f6a92;
+
   /* seizoenstint voor de snoeikalender */
   --tint-w: rgb(58 124 165 / 0.08);
   --tint-l: rgb(141 179 58 / 0.11);

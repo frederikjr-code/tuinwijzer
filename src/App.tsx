@@ -79,6 +79,8 @@ function explain(status: Status, balance: number, rain48: number) {
   return `${past}, en ${next}.`;
 }
 
+const STATUS_WORD: Record<Status, string> = { frost: 'Vorst', ok: 'Goed', water: 'Water geven', soon: 'Bijna droog' };
+
 function Water({ place, setPlace }: { place: Place; setPlace: (p: Place) => void }) {
   const [days, setDays] = useState<Day[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -86,8 +88,8 @@ function Water({ place, setPlace }: { place: Place; setPlace: (p: Place) => void
   useEffect(() => {
     setDays(null);
     setError(null);
-    const demo = new URLSearchParams(location.search).has('demo');
-    (demo ? Promise.resolve(demoWeather()) : fetchWeather(place)).then(setDays).catch((e: Error) => setError(e.message));
+    const demo = new URLSearchParams(location.search).get('demo');
+    (demo !== null ? Promise.resolve(demoWeather(demo)) : fetchWeather(place)).then(setDays).catch((e: Error) => setError(e.message));
   }, [place]);
 
   const [unit, setUnit] = useState<WaterUnit>(() => load('unit', 'gieter' as WaterUnit));
@@ -119,7 +121,6 @@ function Water({ place, setPlace }: { place: Place; setPlace: (p: Place) => void
         <>
           <div className="hero">
             <div className="hero-text">
-              <span className={`hero-mark ${status}`} aria-hidden="true" />
               <p className="hero-big">{headline}</p>
               <p className="hero-sub">{explain(status, result.balance, result.rain48)}</p>
             </div>
@@ -138,7 +139,10 @@ function Water({ place, setPlace }: { place: Place; setPlace: (p: Place) => void
               <li key={a.zone} className="zone">
                 <span className={`stripe ${a.status}`} aria-hidden="true" />
                 <div className="zbody">
-                  <b className="zname">{a.zone}</b>
+                  <div className="zhead">
+                    <b className="zname">{a.zone}</b>
+                    <span className={`zstatus ${a.status}`}>{STATUS_WORD[a.status]}</span>
+                  </div>
                   <p>{a.text}</p>
                 </div>
               </li>
@@ -158,21 +162,27 @@ function Water({ place, setPlace }: { place: Place; setPlace: (p: Place) => void
   );
 }
 
-/** Verticale regenmeter: −30 tot +30 mm, 0 in het midden. */
+/**
+ * Verticale regenmeter: −30 tot +30 mm, 0 in het midden.
+ * Boven +30 loopt de buis over (bolling en druppels over de rand), onder −30 is hij leeg met een droge bodem.
+ */
 function RainGauge({ value }: { value: number }) {
-  const W = 150, H = 300, top = 14, bottom = 286, tx = 52, tw = 40;
+  const W = 170, H = 310, top = 26, bottom = 296, tx = 52, tw = 40, r = tw / 2;
+  const over = value > 30, dry = value < -30;
   const y = (v: number) => top + ((30 - Math.max(-30, Math.min(30, v))) / 60) * (bottom - top);
   const level = y(value);
   const labelY = Math.max(top + 12, Math.min(bottom - 6, level + 6));
+  const labelX = tx + tw + (over ? 20 : 8);
   const ticks = Array.from({ length: 13 }, (_, i) => 30 - i * 5);
+  // open bovenkant, ronde bodem
+  const tube = `M${tx},${top} V${bottom - r} A${r},${r} 0 0 0 ${tx + tw},${bottom - r} V${top}`;
+  const R = tx + tw; // rechterwand
 
   return (
     <figure className="gauge">
-      <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label={`Waterbalans afgelopen 7 dagen: ${mm(value, true)} mm`}>
+      <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label={`Waterbalans afgelopen 7 dagen: ${mm(value, true)} mm${over ? ', de meter loopt over' : dry ? ', de bodem staat droog' : ''}`}>
         <defs>
-          <clipPath id="tube-clip">
-            <rect x={tx} y={top} width={tw} height={bottom - top} rx={tw / 2} />
-          </clipPath>
+          <clipPath id="tube-clip"><path d={`${tube} Z`} /></clipPath>
         </defs>
         {ticks.map((t) => (
           <g key={t}>
@@ -184,20 +194,42 @@ function RainGauge({ value }: { value: number }) {
             )}
           </g>
         ))}
-        <rect x={tx} y={top} width={tw} height={bottom - top} rx={tw / 2} className="tube" />
+        <path d={`${tube} Z`} className="tube" />
         <g clipPath="url(#tube-clip)">
-          <g className="gfill">
-            <rect x={tx} y={level} width={tw} height={bottom - level + 1} className="water" />
-            <rect x={tx} y={level} width={tw} height={3} className="surface" />
-          </g>
-          <line x1={tx + 9} x2={tx + 9} y1={top + 16} y2={bottom - 16} className="glare" />
+          {!dry && (
+            <g className="gfill">
+              <rect x={tx} y={level} width={tw} height={bottom - level + 1} className="water" />
+              {!over && <rect x={tx} y={level} width={tw} height={3} className="surface" />}
+            </g>
+          )}
+          <line x1={tx + 9} x2={tx + 9} y1={top + 12} y2={bottom - 18} className="glare" />
         </g>
-        <rect x={tx} y={top} width={tw} height={bottom - top} rx={tw / 2} className="tube-edge" />
-        <line x1={tx} x2={tx + tw} y1={y(0)} y2={y(0)} className="gzero" />
-        <text x={tx + tw + 8} y={labelY} className="gvalue">{mm(value, true)}</text>
-        <text x={tx + tw + 8} y={labelY + 16} className="gunit">mm</text>
+        {dry && (
+          <g className="gdry" aria-hidden="true" clipPath="url(#tube-clip)">
+            <rect x={tx} y={bottom - 16} width={tw} height={16} className="dry-bed" />
+            <path d={`M${tx + 7},${bottom - 15} l5,6 l5,-4 l4,7 M${tx + 22},${bottom - 15} l3,5 l6,-2 l2,6 M${tx + 14},${bottom - 6} l4,-3`} className="dry-crack" />
+          </g>
+        )}
+        {over && (
+          <g className="gover" aria-hidden="true">
+            <path d={`M${tx - 1},${top} Q${tx + r},${top - 16} ${R + 1},${top} Z`} className="water" />
+            <path d={`M${R - 3},${top - 3} q10,1 10,14 v30`} className="stream" />
+            <path d={`M${R + 7},${top + 52} c-4,6 -4,10 0,10 c4,0 4,-4 0,-10 Z`} className="drop d1" />
+            <path d={`M${R + 7},${top + 72} c-4,6 -4,10 0,10 c4,0 4,-4 0,-10 Z`} className="drop d2" />
+            <path d={`M${tx - 5},${top + 30} c-3,5 -3,8 0,8 c3,0 3,-3 0,-8 Z`} className="drop d2" />
+          </g>
+        )}
+        <path d={tube} className="tube-edge" />
+        <path d={`M${tx - 4},${top} H${tx} M${R},${top} H${R + 4}`} className="tube-edge" />
+        <line x1={tx} x2={R} y1={y(0)} y2={y(0)} className="gzero" />
+        <text x={labelX} y={labelY} className="gvalue">{mm(value, true)}</text>
+        <text x={labelX} y={labelY + 16} className="gunit">mm</text>
       </svg>
-      <figcaption>Waterbalans van de afgelopen 7 dagen</figcaption>
+      <figcaption>
+        Waterbalans van de afgelopen 7 dagen
+        {over && <strong>De meter loopt over.</strong>}
+        {dry && <strong>De bodem staat droog.</strong>}
+      </figcaption>
     </figure>
   );
 }
@@ -267,7 +299,7 @@ function useWidth<T extends HTMLElement>(fallback: number) {
 
 function RainChart({ days }: { days: Day[] }) {
   const [ref, width] = useWidth<HTMLDivElement>(700);
-  const W = Math.max(280, width), H = 180, padL = 26, padB = 36, padT = 8;
+  const W = Math.max(280, width), H = 196, padL = 26, padB = 36, padT = 24;
   const dataMax = Math.max(4, ...days.map((d) => Math.max(d.rain, d.et0)));
   const step = niceStep(dataMax / 3);
   const max = Math.ceil((dataMax * 1.05) / step) * step;
@@ -282,6 +314,12 @@ function RainChart({ days }: { days: Day[] }) {
       <div className="legend"><span className="lg rain" /> Regen <span className="lg evap" /> Verdamping <span className="muted">(in mm)</span></div>
       <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} role="img" aria-label="Regen en verdamping per dag">
         {todayIdx > 0 && <rect x={padL + todayIdx * bw} y={padT} width={W - padL - todayIdx * bw} height={H - padT - padB} className="future" />}
+        {todayIdx > 0 && (
+          <g className="today-mark">
+            <line x1={padL + todayIdx * bw} x2={padL + todayIdx * bw} y1={padT - 12} y2={y(0)} />
+            <text x={padL + todayIdx * bw + 5} y={padT - 4}>vandaag</text>
+          </g>
+        )}
         {ticks.map((t) => (
           <g key={t}>
             <line x1={padL} x2={W} y1={y(t)} y2={y(t)} className={`grid ${t === 0 ? 'base' : ''}`} />
@@ -330,11 +368,20 @@ function Pruning({ mine, setMine }: { mine: string[]; setMine: (ids: string[]) =
   return (
     <section className="section prune" aria-labelledby="prune-h">
       <div className="sechead">
-        <h2 id="prune-h">Snoeikalender</h2>
-        <button className="chip" onClick={() => setPicking(!picking)}>{picking ? 'Klaar' : `Mijn planten (${mine.length}) aanpassen`}</button>
+        <h2 id="prune-h">Maak je eigen snoeikalender</h2>
+        {picking ? (
+          <button className="chip primary" disabled={mine.length === 0} onClick={() => setPicking(false)}>Toon mijn kalender ({mine.length})</button>
+        ) : (
+          <button className="chip" onClick={() => setPicking(true)}>Planten aanpassen</button>
+        )}
       </div>
 
-      {picking && <PlantPicker mine={mine} setMine={setMine} />}
+      {picking && (
+        <>
+          <p className="lead">Kies de planten die in je tuin staan.</p>
+          <PlantPicker mine={mine} setMine={setMine} />
+        </>
+      )}
 
       {!picking && plants.length === 0 && <p className="muted">Kies eerst welke planten je in je tuin hebt.</p>}
 
@@ -463,18 +510,23 @@ function PlantPicker({ mine, setMine }: { mine: string[]; setMine: (ids: string[
   );
 }
 
-/* Voorbeelddata voor ?demo (handig bij testen zonder internet) */
-function demoWeather(): Day[] {
+/*
+ * Voorbeelddata voor ?demo (handig bij testen zonder internet).
+ * Varianten: ?demo=nat (meter loopt over), ?demo=droog (lege meter), ?demo=vorst.
+ */
+function demoWeather(kind: string): Day[] {
   const today = new Date();
+  const wet = kind === 'nat', dry = kind === 'droog';
   return Array.from({ length: 14 }, (_, i) => {
     const d = new Date(today.getTime() + (i - 7) * 86400_000);
-    const rain = [0, 0.4, 0, 0, 1.2, 0, 0, 0, 0, 6.5, 2.1, 0, 0, 0.3][i];
+    const rain = wet ? [8, 12, 4, 9, 6, 3, 7, 2, 0, 1, 0, 0, 0, 0][i] : [0, 0.4, 0, 0, 1.2, 0, 0, 0, 0, 6.5, 2.1, 0, 0, 0.3][i];
+    const et0 = [3.1, 3.4, 3.8, 4.2, 3.0, 3.9, 4.4, 4.1, 3.6, 1.2, 1.8, 3.3, 3.9, 4.0][i] * (dry ? 1.6 : wet ? 0.4 : 1);
     return {
       date: d.toISOString().slice(0, 10),
-      rain,
-      et0: [3.1, 3.4, 3.8, 4.2, 3.0, 3.9, 4.4, 4.1, 3.6, 1.2, 1.8, 3.3, 3.9, 4.0][i],
-      tmax: 24,
-      tmin: 12,
+      rain: dry ? 0 : rain,
+      et0,
+      tmax: kind === 'vorst' ? 3 : 24,
+      tmin: kind === 'vorst' ? -3 : 12,
       past: i < 7,
     };
   });

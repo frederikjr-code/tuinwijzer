@@ -83,16 +83,17 @@ export function waterAdvice(days: Day[], unit: WaterUnit = 'gieter'): { balance:
       frostTip: 'Dek gevoelige planten af met vliesdoek of een laag blad rond de voet.' },
     { zone: 'Moestuin', icon: '🥕', limit: -12, dose: { liters: [10, 10], per: 'm²' }, how: 'bij de wortels en niet over het blad', b: balance,
       frostTip: 'Bescherm wintergroenten met vliesdoek en oogst wat niet tegen vorst kan.' },
-    { zone: 'Potten', icon: '🪴', limit: -6, how: 'tot er water uit het gat onderin loopt, voel eerst of de grond droog is', b: last3,
+    { zone: 'Potten', icon: '🪴', limit: -6, how: 'geef water tot het uit het gat onderin loopt, voel eerst of de grond droog is', b: last3,
       frostTip: 'Potten liever droog en beschut zetten.' },
   ];
 
   const advice = zones.map(({ zone, icon, limit, dose, how, b, frostTip }): Advice => {
     const amount = dose ? `${formatDose(dose, unit)}, ${how}` : how;
-    if (frost) return { zone, icon, status: 'frost', text: `Vorst verwacht: geen water geven. ${frostTip}` };
+    // De status ("Vorst", "Water geven", …) staat als woord in de rij; de tekst herhaalt die niet.
+    if (frost) return { zone, icon, status: 'frost', text: frostTip };
     if (lowEvap && b > limit) return { zone, icon, status: 'ok', text: 'De tuin is in rust en verdampt nauwelijks. Geen water nodig.' };
     if (rain48 >= 5 && b > limit * 2) return { zone, icon, status: 'ok', text: `Er komt ${rain48.toFixed(0)} mm regen aan. Wacht dat even af.` };
-    if (b <= limit) return { zone, icon, status: 'water', text: `Water geven: ${amount}.` };
+    if (b <= limit) return { zone, icon, status: 'water', text: `${amount[0].toUpperCase()}${amount.slice(1)}.` };
     if (b <= limit / 2) return { zone, icon, status: 'soon', text: 'Het wordt droger. Houd het in de gaten, binnen een paar dagen is water nodig.' };
     return { zone, icon, status: 'ok', text: 'Genoeg vocht in de grond. Geen water nodig.' };
   });
