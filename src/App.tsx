@@ -662,24 +662,6 @@ function Pruning({ mine, setMine }: { mine: string[]; setMine: (ids: string[]) =
         )}
       </section>
 
-      {plants.length > 0 && (
-        <section className="block" aria-labelledby="year-h">
-          <h2 id="year-h">Mijn snoeikalender</h2>
-          <YearGrid plants={plants} month={month} />
-
-          <h3>Per plant</h3>
-          <ul className="pcards">{plants.map((p) => <PlantCard key={p.id} p={p} month={month} />)}</ul>
-
-          <div className="actions">
-            <button className="btn" onClick={() => window.print()}>Printen voor in de schuur</button>
-            <button className="btn ghost" onClick={download} disabled={pruned.length === 0}>Zet in mijn agenda (.ics)</button>
-          </div>
-          <p className="muted small">
-            Printen geeft een A4 liggend. De agenda werkt met Google, Outlook en Apple en herinnert je elk jaar op de 1e van de snoeimaand.
-          </p>
-        </section>
-      )}
-
       <section className="block" aria-labelledby="mine-h">
         <div className="sechead">
           <h2 id="mine-h">Mijn planten</h2>
@@ -706,6 +688,23 @@ function Pruning({ mine, setMine }: { mine: string[]; setMine: (ids: string[]) =
         <PlantPicker mine={mine} toggle={toggle} />
       </section>
 
+      {plants.length > 0 && (
+        <section className="block" aria-labelledby="year-h">
+          <h2 id="year-h">Mijn snoeikalender</h2>
+          <YearGrid plants={plants} month={month} />
+
+          <h3>Per plant</h3>
+          <ul className="pcards">{plants.map((p) => <PlantCard key={p.id} p={p} month={month} />)}</ul>
+
+          <div className="actions">
+            <button className="btn" onClick={() => window.print()}>Printen voor in de schuur</button>
+            <button className="btn ghost" onClick={download} disabled={pruned.length === 0}>Zet in mijn agenda (.ics)</button>
+          </div>
+          <p className="muted small">
+            Printen geeft een A4 liggend. De agenda werkt met Google, Outlook en Apple en herinnert je elk jaar op de 1e van de snoeimaand.
+          </p>
+        </section>
+      )}
 
       {plants.length > 0 && <PrintPoster plants={plants} />}
       <ToastSlot toast={toast} close={() => setToast(null)} />
