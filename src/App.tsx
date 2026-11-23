@@ -2,9 +2,10 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import './App.css';
 import { MONTHS, MONTHS_LONG, PLANTS, type Plant, buildIcs } from './plants';
 import {
-  type Day, DEFAULT_PLACE, GIETER_LITER, type Place, SLANG_LITER_PER_MIN, type Status, type WaterUnit,
-  fetchWeather, searchPlace, waterAdvice,
+  type Advice, type Day, DEFAULT_PLACE, GIETER_LITER, type Gift, type Place, SLANG_LITER_PER_MIN, type Status, type WaterUnit,
+  addDays, dayPhrase, fetchWeather, isoToday, searchPlace, waterAdvice,
 } from './weather';
+import { AMOUNT_LABEL, type Amount, NORMAL_MM, giftMm, useGardenLog } from './gifts';
 
 function load<T>(key: string, fallback: T): T {
   try {
@@ -67,34 +68,70 @@ export default function App() {
 
 /* ---------------- Wateradvies ---------------- */
 
-function explain(status: Status, balance: number, rain48: number) {
+const DEMO = new URLSearchParams(location.search).get('demo');
+
+const longDate = (iso: string) =>
+  new Intl.DateTimeFormat('nl-NL', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC' }).format(new Date(iso + 'T12:00:00Z'));
+const weekdayDay = (iso: string) =>
+  new Intl.DateTimeFormat('nl-NL', { weekday: 'long', day: 'numeric', timeZone: 'UTC' }).format(new Date(iso + 'T12:00:00Z'));
+
+function explain(status: Status, ref: Advice, rain48: number) {
   if (status === 'frost') return 'Er wordt binnen drie dagen vorst verwacht, en natte grond en potten bevriezen dan sneller.';
+  const period = ref.windowDays === 7 ? 'De afgelopen week' : `De afgelopen ${ref.windowDays} dagen`;
+  const n = ref.natural;
   const past =
-    balance <= -0.5
-      ? `De afgelopen week verdampte er ${mm(-balance)} mm meer dan er viel`
-      : balance >= 0.5
-        ? `De afgelopen week viel er ${mm(balance)} mm meer regen dan er verdampte`
-        : 'Regen en verdamping hielden elkaar de afgelopen week in evenwicht';
+    n <= -0.5
+      ? `${period} verdampte er ${mm(-n)} mm meer dan er viel`
+      : n >= 0.5
+        ? `${period} viel er ${mm(n)} mm meer regen dan er verdampte`
+        : `Regen en verdamping hielden elkaar ${period.toLowerCase()} in evenwicht`;
+  const own = ref.given > 0 ? `, je gaf zelf ${mm(ref.given)} mm water` : '';
   const next = rain48 >= 0.5 ? `de komende twee dagen valt naar verwachting ${mm(rain48)} mm` : 'de komende twee dagen blijft het naar verwachting droog';
-  return `${past}, en ${next}.`;
+  return `${past}${own}, en ${next}.`;
+}
+
+/** "Ervan uitgaande dat je sinds maandag 16 november geen water gaf." voor dagen zonder antwoord. */
+function assumption(pastDates: string[], known: (d: string) => boolean): string | null {
+  const unknown = pastDates.filter((d) => !known(d));
+  if (unknown.length === 0) return null;
+  const first = pastDates.indexOf(unknown[0]);
+  const contiguous = unknown.every((d, i) => d === pastDates[first + i]);
+  const endsYesterday = unknown[unknown.length - 1] === pastDates[pastDates.length - 1];
+  if (unknown.length === 1) return `Ervan uitgaande dat je ${endsYesterday ? 'gisteren' : `op ${weekdayDay(unknown[0])}`} geen water gaf.`;
+  if (contiguous && endsYesterday) return `Ervan uitgaande dat je sinds ${longDate(unknown[0])} geen water gaf.`;
+  if (contiguous) return `Ervan uitgaande dat je van ${weekdayDay(unknown[0])} tot en met ${longDate(unknown[unknown.length - 1])} geen water gaf.`;
+  return `Ervan uitgaande dat je op ${joinNl(unknown.map(weekdayDay))} geen water gaf.`;
 }
 
 const STATUS_WORD: Record<Status, string> = { frost: 'Vorst', ok: 'Goed', water: 'Water geven', soon: 'Bijna droog' };
+const DAY_LABELS = ['Vandaag', 'Gisteren', 'Eergisteren'];
+const AMOUNTS: Amount[] = ['beetje', 'normaal', 'flink'];
+
+type Toast = { text: string; undo: () => void };
 
 function Water({ place, setPlace }: { place: Place; setPlace: (p: Place) => void }) {
   const [days, setDays] = useState<Day[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [today] = useState(isoToday);
+  const yesterday = addDays(today, -1);
+  const log = useGardenLog(today, DEMO !== null);
+  const [toast, setToast] = useState<Toast | null>(null);
 
   useEffect(() => {
     setDays(null);
     setError(null);
-    const demo = new URLSearchParams(location.search).get('demo');
-    (demo !== null ? Promise.resolve(demoWeather(demo)) : fetchWeather(place)).then(setDays).catch((e: Error) => setError(e.message));
+    (DEMO !== null ? Promise.resolve(demoWeather(DEMO)) : fetchWeather(place)).then(setDays).catch((e: Error) => setError(e.message));
   }, [place]);
+
+  useEffect(() => {
+    if (!toast) return;
+    const t = setTimeout(() => setToast(null), 8000);
+    return () => clearTimeout(t);
+  }, [toast]);
 
   const [unit, setUnit] = useState<WaterUnit>(() => load('unit', 'gieter' as WaterUnit));
   useEffect(() => save('unit', unit), [unit]);
-  const result = useMemo(() => (days ? waterAdvice(days, unit) : null), [days, unit]);
+  const result = useMemo(() => (days ? waterAdvice(days, unit, log.gifts, today) : null), [days, unit, log.gifts, today]);
   const worst = result?.advice.find((a) => a.status === 'water') ?? result?.advice.find((a) => a.status === 'frost') ?? result?.advice.find((a) => a.status === 'soon');
   const status: Status = worst?.status ?? 'ok';
   const headline = !result
@@ -107,6 +144,23 @@ function Water({ place, setPlace }: { place: Place; setPlace: (p: Place) => void
           ? 'Nog niet, maar het wordt droger'
           : 'Geen water nodig';
 
+  // De regenmeter toont de zone die het meeste water nodig heeft, anders Gras.
+  const ref = result
+    ? ([...result.advice].filter((a) => a.status === 'water' || a.status === 'soon').sort((a, b) => a.balance - a.limit - (b.balance - b.limit))[0] ??
+      result.advice.find((a) => a.zone === 'Gras') ??
+      result.advice[0])
+    : null;
+
+  const logGifts = (zones: string[], date: string, amount: Amount, extraUndo?: () => void) => {
+    const ids = log.addGifts(zones.map((zone) => ({ zone, date, amount })));
+    const when = date === today ? '' : ` (${dayPhrase(date, today)})`;
+    setToast({ text: `Water gegeven bij ${joinNl(zones)}${when}`, undo: () => { log.removeGifts(ids); extraUndo?.(); } });
+  };
+
+  // Geen check-in bij vorst of als de tuin in rust is: dan doet water geven er niet toe.
+  const showCheckIn = result && !result.frost && !result.resting && !log.known(yesterday);
+  const note = result && !result.frost && !result.resting ? assumption(result.pastDates, log.known) : null;
+
   return (
     <section className="section" aria-labelledby="water-h">
       <div className="sechead">
@@ -117,14 +171,15 @@ function Water({ place, setPlace }: { place: Place; setPlace: (p: Place) => void
       {error && <p className="notice">Het weer kon niet worden opgehaald: {error}</p>}
       {!error && !result && <p className="muted loading">Het weer wordt opgehaald…</p>}
 
-      {result && days && (
+      {result && days && ref && (
         <>
           <div className="hero">
             <div className="hero-text">
               <p className="hero-big">{headline}</p>
-              <p className="hero-sub">{explain(status, result.balance, result.rain48)}</p>
+              <p className="hero-sub">{explain(status, ref, result.rain48)}</p>
+              {note && <p className="hero-note">{note}</p>}
             </div>
-            <RainGauge value={result.balance} />
+            <RainGauge natural={ref.natural} given={ref.given} zone={ref.zone} windowDays={ref.windowDays} />
           </div>
 
           <div className="subhead">
@@ -134,6 +189,21 @@ function Water({ place, setPlace }: { place: Place; setPlace: (p: Place) => void
               <button aria-pressed={unit === 'slang'} onClick={() => setUnit('slang')}>Tuinslang</button>
             </div>
           </div>
+
+          {showCheckIn && (
+            <CheckIn
+              zones={result.advice.map((a) => a.zone)}
+              onYes={(zones, amount) => {
+                log.addAnswer(yesterday);
+                logGifts(zones, yesterday, amount, () => log.removeAnswer(yesterday));
+              }}
+              onNo={() => {
+                log.addAnswer(yesterday);
+                setToast({ text: 'Genoteerd: gisteren geen water gegeven', undo: () => log.removeAnswer(yesterday) });
+              }}
+            />
+          )}
+
           <ul className="zones">
             {result.advice.map((a) => (
               <li key={a.zone} className="zone">
@@ -144,6 +214,7 @@ function Water({ place, setPlace }: { place: Place; setPlace: (p: Place) => void
                     <span className={`zstatus ${a.status}`}>{STATUS_WORD[a.status]}</span>
                   </div>
                   <p>{a.text}</p>
+                  <ZoneLog zone={a.zone} onLog={(daysAgo, amount) => logGifts([a.zone], addDays(today, -daysAgo), amount)} />
                 </div>
               </li>
             ))}
@@ -152,35 +223,138 @@ function Water({ place, setPlace }: { place: Place; setPlace: (p: Place) => void
             {unit === 'gieter'
               ? `Uitgaande van een gieter van ${GIETER_LITER} liter.`
               : `Uitgaande van een tuinslang met sproeikop, die ongeveer ${SLANG_LITER_PER_MIN} liter per minuut geeft.`}
+            {' '}Een normale gift telt als {joinNl(Object.entries(NORMAL_MM).map(([z, v]) => `${v} mm bij ${z}`))}.
           </p>
 
-          <h3>Regen en verdamping per dag</h3>
-          <RainChart days={days} />
+          <h3>Regen, verdamping en jouw water per dag</h3>
+          <RainChart days={days} gifts={log.gifts} />
         </>
       )}
+
+      <div className="toast-slot" role="status" aria-live="polite">
+        {toast && (
+          <div className="toast">
+            <span>{toast.text}, </span>
+            <button onClick={() => { toast.undo(); setToast(null); }}>ongedaan maken</button>
+          </div>
+        )}
+      </div>
     </section>
+  );
+}
+
+/** Dagelijkse vraag over gisteren. Verdwijnt zodra er een antwoord (of een gift voor gisteren) is. */
+function CheckIn({ zones, onYes, onNo }: { zones: string[]; onYes: (zones: string[], amount: Amount) => void; onNo: () => void }) {
+  const [choosing, setChoosing] = useState(false);
+  const [sel, setSel] = useState<string[]>([]);
+  const [amount, setAmount] = useState<Amount>('normaal');
+  const toggle = (z: string) => setSel(sel.includes(z) ? sel.filter((x) => x !== z) : [...sel, z]);
+
+  return (
+    <div className="checkin">
+      <div className="crow">
+        <p className="cq">Heb je gisteren water gegeven?</p>
+        {!choosing && (
+          <div className="cbtns">
+            <button className="chip" onClick={() => setChoosing(true)}>Ja</button>
+            <button className="chip" onClick={onNo}>Nee</button>
+          </div>
+        )}
+      </div>
+      {choosing && (
+        <div className="cchoose">
+          <p className="mlabel">Welke zones?</p>
+          <div className="chips">
+            {zones.map((z) => (
+              <button key={z} className={`pchip ${sel.includes(z) ? 'on' : ''}`} aria-pressed={sel.includes(z)} onClick={() => toggle(z)}>
+                {sel.includes(z) ? '✓ ' : '+ '}{z}
+              </button>
+            ))}
+          </div>
+          <p className="mlabel">Hoeveel?</p>
+          <div className="seg" role="group" aria-label="Hoeveelheid">
+            {AMOUNTS.map((a) => <button key={a} aria-pressed={amount === a} onClick={() => setAmount(a)}>{AMOUNT_LABEL[a]}</button>)}
+          </div>
+          <div className="actions">
+            <button className="btn" disabled={sel.length === 0} onClick={() => onYes(sel, amount)}>Opslaan</button>
+            <button className="btn ghost" onClick={() => setChoosing(false)}>Annuleren</button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** "Water gegeven": één tik is een normale gift vandaag; het pijltje opent dag en hoeveelheid. */
+function ZoneLog({ zone, onLog }: { zone: string; onLog: (daysAgo: number, amount: Amount) => void }) {
+  const [open, setOpen] = useState(false);
+  const [day, setDay] = useState(0);
+  const [amount, setAmount] = useState<Amount>('normaal');
+  const box = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const close = (e: MouseEvent) => {
+      if (!box.current?.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', close);
+    return () => document.removeEventListener('mousedown', close);
+  }, [open]);
+
+  return (
+    <div className="zlog" ref={box} onKeyDown={(e) => e.key === 'Escape' && setOpen(false)}>
+      <div className="split">
+        <button className="chip" onClick={() => onLog(0, 'normaal')}>
+          <svg viewBox="0 0 16 16" aria-hidden="true" className="ico"><path d="M8 2.5s4 4.3 4 7.2a4 4 0 0 1-8 0C4 6.8 8 2.5 8 2.5Z" /></svg>
+          Water gegeven
+        </button>
+        <button className="chip more" aria-expanded={open} aria-label={`Andere dag of hoeveelheid voor ${zone}`} onClick={() => setOpen(!open)}>
+          <svg viewBox="0 0 16 16" aria-hidden="true" className="ico chev"><path d="m4 6 4 4 4-4" /></svg>
+        </button>
+      </div>
+      {open && (
+        <div className="popover logmenu" role="dialog" aria-label={`Water gegeven bij ${zone}`}>
+          <p className="mlabel">Wanneer?</p>
+          <div className="seg" role="group" aria-label="Dag">
+            {DAY_LABELS.map((l, i) => <button key={l} aria-pressed={day === i} onClick={() => setDay(i)}>{l}</button>)}
+          </div>
+          <p className="mlabel">Hoeveel?</p>
+          <div className="seg" role="group" aria-label="Hoeveelheid">
+            {AMOUNTS.map((a) => <button key={a} aria-pressed={amount === a} onClick={() => setAmount(a)}>{AMOUNT_LABEL[a]}</button>)}
+          </div>
+          <button className="btn" onClick={() => { onLog(day, amount); setOpen(false); }}>
+            Opslaan ({new Intl.NumberFormat('nl-NL', { maximumFractionDigits: 1 }).format(giftMm(zone, amount))} mm)
+          </button>
+        </div>
+      )}
+    </div>
   );
 }
 
 /**
  * Verticale regenmeter: −30 tot +30 mm, 0 in het midden.
+ * Onderste laag: regen − verdamping. Daarbovenop: jouw eigen water.
  * Boven +30 loopt de buis over (bolling en druppels over de rand), onder −30 is hij leeg met een droge bodem.
  */
-function RainGauge({ value }: { value: number }) {
+function RainGauge({ natural, given, zone, windowDays }: { natural: number; given: number; zone: string; windowDays: number }) {
+  const value = natural + given;
   const W = 170, H = 310, top = 26, bottom = 296, tx = 52, tw = 40, r = tw / 2;
   const over = value > 30, dry = value < -30;
   const y = (v: number) => top + ((30 - Math.max(-30, Math.min(30, v))) / 60) * (bottom - top);
-  const level = y(value);
+  const level = y(value), natLevel = y(natural);
+  const hasGift = given > 0 && natLevel > level;
   const labelY = Math.max(top + 12, Math.min(bottom - 6, level + 6));
   const labelX = tx + tw + (over ? 20 : 8);
   const ticks = Array.from({ length: 13 }, (_, i) => 30 - i * 5);
   // open bovenkant, ronde bodem
   const tube = `M${tx},${top} V${bottom - r} A${r},${r} 0 0 0 ${tx + tw},${bottom - r} V${top}`;
   const R = tx + tw; // rechterwand
+  const period = windowDays === 7 ? 'de afgelopen 7 dagen' : `de afgelopen ${windowDays} dagen`;
 
   return (
     <figure className="gauge">
-      <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label={`Waterbalans afgelopen 7 dagen: ${mm(value, true)} mm${over ? ', de meter loopt over' : dry ? ', de bodem staat droog' : ''}`}>
+      <svg viewBox={`0 0 ${W} ${H}`} role="img"
+        aria-label={`Waterbalans bij ${zone}, ${period}: ${mm(value, true)} mm${given > 0 ? `, waarvan ${mm(given)} mm jouw water` : ''}${over ? ', de meter loopt over' : dry ? ', de bodem staat droog' : ''}`}>
         <defs>
           <clipPath id="tube-clip"><path d={`${tube} Z`} /></clipPath>
         </defs>
@@ -198,8 +372,9 @@ function RainGauge({ value }: { value: number }) {
         <g clipPath="url(#tube-clip)">
           {!dry && (
             <g className="gfill">
-              <rect x={tx} y={level} width={tw} height={bottom - level + 1} className="water" />
-              {!over && <rect x={tx} y={level} width={tw} height={3} className="surface" />}
+              <rect x={tx} y={natLevel} width={tw} height={bottom - natLevel + 1} className="water" />
+              {hasGift && <rect x={tx} y={level} width={tw} height={natLevel - level} className="gift" />}
+              {!over && <rect x={tx} y={level} width={tw} height={3} className={hasGift ? 'surface gift-top' : 'surface'} />}
             </g>
           )}
           <line x1={tx + 9} x2={tx + 9} y1={top + 12} y2={bottom - 18} className="glare" />
@@ -212,7 +387,7 @@ function RainGauge({ value }: { value: number }) {
         )}
         {over && (
           <g className="gover" aria-hidden="true">
-            <path d={`M${tx - 1},${top} Q${tx + r},${top - 16} ${R + 1},${top} Z`} className="water" />
+            <path d={`M${tx - 1},${top} Q${tx + r},${top - 16} ${R + 1},${top} Z`} className={hasGift ? 'gift' : 'water'} />
             <path d={`M${R - 3},${top - 3} q10,1 10,14 v30`} className="stream" />
             <path d={`M${R + 7},${top + 52} c-4,6 -4,10 0,10 c4,0 4,-4 0,-10 Z`} className="drop d1" />
             <path d={`M${R + 7},${top + 72} c-4,6 -4,10 0,10 c4,0 4,-4 0,-10 Z`} className="drop d2" />
@@ -226,9 +401,13 @@ function RainGauge({ value }: { value: number }) {
         <text x={labelX} y={labelY + 16} className="gunit">mm</text>
       </svg>
       <figcaption>
-        Waterbalans van de afgelopen 7 dagen
+        Waterbalans bij {zone}, {period}
         {over && <strong>De meter loopt over.</strong>}
         {dry && <strong>De bodem staat droog.</strong>}
+        <span className="glegend">
+          <span><i className="sw rain" /> regen</span>
+          <span><i className="sw gift" /> jouw water</span>
+        </span>
       </figcaption>
     </figure>
   );
@@ -297,10 +476,13 @@ function useWidth<T extends HTMLElement>(fallback: number) {
   return [ref, w] as const;
 }
 
-function RainChart({ days }: { days: Day[] }) {
+/** Per dag: rechts van de regen een balkje voor jouw grootste gift die dag (tooltip toont alle zones). */
+function RainChart({ days, gifts }: { days: Day[]; gifts: Gift[] }) {
   const [ref, width] = useWidth<HTMLDivElement>(700);
   const W = Math.max(280, width), H = 196, padL = 26, padB = 36, padT = 24;
-  const dataMax = Math.max(4, ...days.map((d) => Math.max(d.rain, d.et0)));
+  const giftsOn = (date: string) => gifts.filter((g) => g.date === date);
+  const giftMax = (date: string) => Math.max(0, ...giftsOn(date).map((g) => g.mm));
+  const dataMax = Math.max(4, ...days.map((d) => Math.max(d.rain, d.et0, giftMax(d.date))));
   const step = niceStep(dataMax / 3);
   const max = Math.ceil((dataMax * 1.05) / step) * step;
   const ticks = Array.from({ length: Math.round(max / step) + 1 }, (_, i) => i * step);
@@ -311,8 +493,10 @@ function RainChart({ days }: { days: Day[] }) {
 
   return (
     <div className="chart" ref={ref}>
-      <div className="legend"><span className="lg rain" /> Regen <span className="lg evap" /> Verdamping <span className="muted">(in mm)</span></div>
-      <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} role="img" aria-label="Regen en verdamping per dag">
+      <div className="legend">
+        <span className="lg rain" /> Regen <span className="lg gift" /> Jouw water <span className="lg evap" /> Verdamping <span className="muted">(in mm)</span>
+      </div>
+      <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} role="img" aria-label="Regen, jouw water en verdamping per dag">
         {todayIdx > 0 && <rect x={padL + todayIdx * bw} y={padT} width={W - padL - todayIdx * bw} height={H - padT - padB} className="future" />}
         {todayIdx > 0 && (
           <g className="today-mark">
@@ -329,17 +513,27 @@ function RainChart({ days }: { days: Day[] }) {
         {days.map((d, i) => {
           const x = padL + i * bw;
           const [wd, dn] = fmt(d.date).split(' ');
+          const g = giftMax(d.date);
+          const rx = Math.min(2, bw * 0.06);
           return (
             <g key={d.date}>
-              <rect x={x + bw * 0.16} width={bw * 0.32} y={y(d.rain)} height={y(0) - y(d.rain)} rx={Math.min(2, bw * 0.08)} className="rain"><title>{`${fmt(d.date)}: ${mm(d.rain)} mm regen`}</title></rect>
-              <rect x={x + bw * 0.52} width={bw * 0.32} y={y(d.et0)} height={y(0) - y(d.et0)} rx={Math.min(2, bw * 0.08)} className="evap"><title>{`${fmt(d.date)}: ${mm(d.et0)} mm verdamping`}</title></rect>
+              <rect x={x + bw * 0.1} width={bw * 0.26} y={y(d.rain)} height={y(0) - y(d.rain)} rx={rx} className="rain"><title>{`${fmt(d.date)}: ${mm(d.rain)} mm regen`}</title></rect>
+              {g > 0 && (
+                <rect x={x + bw * 0.37} width={bw * 0.26} y={y(g)} height={y(0) - y(g)} rx={rx} className="gift">
+                  <title>{`${fmt(d.date)}, jouw water: ${giftsOn(d.date).map((x) => `${x.zone} ${mm(x.mm)} mm`).join(', ')}`}</title>
+                </rect>
+              )}
+              <rect x={x + bw * 0.64} width={bw * 0.26} y={y(d.et0)} height={y(0) - y(d.et0)} rx={rx} className="evap"><title>{`${fmt(d.date)}: ${mm(d.et0)} mm verdamping`}</title></rect>
               <text x={x + bw / 2} y={H - 20} className={`axis ${i === todayIdx ? 'today' : ''}`} textAnchor="middle">{wd}</text>
               <text x={x + bw / 2} y={H - 6} className={`axis ${i === todayIdx ? 'today' : ''}`} textAnchor="middle">{dn}</text>
             </g>
           );
         })}
       </svg>
-      <p className="muted small">Links zie je de afgelopen week, rechts in het lichtere vlak de verwachting.</p>
+      <p className="muted small">
+        Links zie je de afgelopen week, rechts in het lichtere vlak de verwachting. Gaf je op één dag aan meer zones water, dan
+        toont het groene balkje de grootste gift.
+      </p>
     </div>
   );
 }
@@ -512,17 +706,17 @@ function PlantPicker({ mine, setMine }: { mine: string[]; setMine: (ids: string[
 
 /*
  * Voorbeelddata voor ?demo (handig bij testen zonder internet).
- * Varianten: ?demo=nat (meter loopt over), ?demo=droog (lege meter), ?demo=vorst.
+ * Gewoon ?demo is een droge zomerweek, ook in de winter. Varianten: ?demo=nat (meter loopt over),
+ * ?demo=droog (lege meter), ?demo=vorst, ?demo=rust (winterrust). Giften en check-ins in de demo worden apart bewaard.
  */
 function demoWeather(kind: string): Day[] {
-  const today = new Date();
+  const today = isoToday();
   const wet = kind === 'nat', dry = kind === 'droog';
   return Array.from({ length: 14 }, (_, i) => {
-    const d = new Date(today.getTime() + (i - 7) * 86400_000);
     const rain = wet ? [8, 12, 4, 9, 6, 3, 7, 2, 0, 1, 0, 0, 0, 0][i] : [0, 0.4, 0, 0, 1.2, 0, 0, 0, 0, 6.5, 2.1, 0, 0, 0.3][i];
-    const et0 = [3.1, 3.4, 3.8, 4.2, 3.0, 3.9, 4.4, 4.1, 3.6, 1.2, 1.8, 3.3, 3.9, 4.0][i] * (dry ? 1.6 : wet ? 0.4 : 1);
+    const et0 = [3.1, 3.4, 3.8, 4.2, 3.0, 3.9, 4.4, 4.1, 3.6, 1.2, 1.8, 3.3, 3.9, 4.0][i] * (dry ? 1.6 : wet ? 0.4 : kind === 'rust' ? 0.08 : 1);
     return {
-      date: d.toISOString().slice(0, 10),
+      date: addDays(today, i - 7),
       rain: dry ? 0 : rain,
       et0,
       tmax: kind === 'vorst' ? 3 : 24,

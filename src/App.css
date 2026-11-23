@@ -68,12 +68,20 @@ p { margin: 0; }
 
 .gauge { margin: 0; display: flex; flex-direction: column; align-items: center; }
 .gauge svg { width: 170px; height: auto; display: block; overflow: visible; }
+.glegend { display: flex; justify-content: center; gap: 12px; margin-top: 6px; }
+.glegend > span { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
+.sw { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
+.sw.rain { background: var(--rain); }
+.sw.gift { background: var(--gift); }
+.hero-note { margin-top: 10px; font-size: 15px; color: var(--muted); max-width: 40ch; }
 .gauge figcaption strong { display: block; margin-top: 2px; color: var(--ink); font-weight: 600; }
 .gauge figcaption { font-size: 13px; color: var(--muted); text-align: center; max-width: 18ch; line-height: 1.3; margin-top: 6px; }
 .tube { fill: rgb(255 255 255 / 0.5); }
 .tube-edge { fill: none; stroke: rgb(20 48 42 / 0.45); stroke-width: 1.5; }
 .water { fill: var(--rain); fill-opacity: 0.88; }
 .surface { fill: #8fbcd8; }
+.gift { fill: var(--gift); }
+.surface.gift-top { fill: #b9d47a; }
 .stream { fill: none; stroke: var(--rain); stroke-width: 4; stroke-linecap: round; opacity: 0.88; }
 .drop { fill: var(--rain); opacity: 0.88; }
 .dry-bed { fill: var(--water); opacity: 0.45; }
@@ -118,11 +126,38 @@ p { margin: 0; }
 .seg button:hover { background: var(--bg); }
 .seg button[aria-pressed='true'] { background: var(--ink); color: #fff; }
 
+/* ---------- check-in ---------- */
+.checkin { background: rgb(255 255 255 / 0.55); border-radius: var(--r-md); padding: 14px 16px; margin-bottom: 14px; }
+.crow { display: flex; align-items: center; justify-content: space-between; gap: 10px 16px; flex-wrap: wrap; }
+.cq { font-weight: 600; font-size: 17px; }
+.cbtns { display: flex; gap: 8px; }
+.cbtns .chip { min-width: 64px; justify-content: center; }
+.mlabel { font-size: 14px; color: var(--muted); margin: 14px 0 6px; }
+.cchoose .actions { margin-top: 16px; }
+.btn:disabled { opacity: 0.45; cursor: not-allowed; }
+
+/* ---------- water gegeven per zone ---------- */
+.zlog { position: relative; grid-column: 3; grid-row: 1 / span 2; align-self: start; }
+.split { display: inline-flex; }
+.split .chip { border-radius: 999px 0 0 999px; font-size: 14px; min-height: 36px; padding: 5px 12px; white-space: nowrap; }
+.split .chip.more { border-radius: 0 999px 999px 0; border-left: 0; padding: 5px 9px; }
+.zlog .ico { stroke: var(--rain); }
+.logmenu { top: 44px; width: min(320px, calc(100vw - 32px)); padding: 6px 14px 14px; }
+.logmenu .seg { display: grid; grid-template-columns: repeat(3, 1fr); }
+.logmenu .seg button { padding: 6px 4px; font-size: 14px; }
+.logmenu .btn { margin-top: 14px; width: 100%; }
+
+/* ---------- bevestiging met ongedaan maken ---------- */
+.toast-slot { position: fixed; left: 16px; bottom: 16px; z-index: 20; max-width: calc(100vw - 32px); }
+.toast { background: var(--ink); color: #fff; border-radius: var(--r-md); padding: 12px 16px; font-size: 15px; animation: fade-in .2s ease-out; }
+.toast button { background: none; border: 0; color: #fff; text-decoration: underline; text-underline-offset: 3px; font-weight: 600; cursor: pointer; padding: 0; }
+.toast button:focus-visible { outline-color: #fff; }
+
 /* ---------- zones als lijst ---------- */
 .zones, .tips { list-style: none; margin: 0; padding: 0; }
 .zone, .tip { display: flex; gap: 16px; padding: 14px 0; border-top: 1px solid var(--line); }
 .zone:last-child, .tip:last-child { border-bottom: 1px solid var(--line); }
-.zbody { display: grid; grid-template-columns: 11rem 1fr; gap: 4px 16px; flex: 1; }
+.zbody { display: grid; grid-template-columns: 11rem 1fr auto; gap: 4px 16px; flex: 1; align-items: start; }
 .zhead { display: flex; flex-direction: column; gap: 1px; }
 .zname { font-weight: 650; }
 .zone p, .tip p { line-height: 1.45; }
@@ -133,7 +168,8 @@ p { margin: 0; }
 .chart svg { display: block; overflow: visible; }
 .legend { font-size: 14px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-bottom: 8px; }
 .lg { width: 12px; height: 12px; border-radius: 3px; display: inline-block; }
-.lg.evap { margin-left: 10px; }
+.lg.evap, .lg.gift { margin-left: 10px; }
+.lg.gift, rect.gift { background: var(--gift); fill: var(--gift); }
 .lg.rain, rect.rain { background: var(--rain); fill: var(--rain); }
 .lg.evap, rect.evap { background: var(--evap); fill: var(--evap); }
 .grid { stroke: var(--line); }
@@ -217,6 +253,8 @@ footer { color: var(--muted); font-size: 14px; line-height: 1.6; margin-top: 80p
   .gauge figcaption { text-align: left; }
   .hero-sub { font-size: 17px; }
   .zbody { grid-template-columns: 1fr; }
+  .zlog { grid-column: 1; grid-row: auto; margin-top: 6px; }
+  .logmenu { right: auto; left: 0; }
   .zhead { flex-direction: row; align-items: baseline; gap: 10px; }
   .popover { right: auto; left: 0; }
   h3 { margin-top: 32px; }
