@@ -9,6 +9,12 @@
   </head>
   <body>
     <div id="root"></div>
+    <!-- Voor Netlify Forms: zo herkent Netlify het formulier bij de build. Het echte formulier staat in de app. -->
+    <form name="plant-suggestie" data-netlify="true" netlify-honeypot="bot-field" hidden>
+      <input name="plant" />
+      <textarea name="toelichting"></textarea>
+      <input name="bot-field" />
+    </form>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

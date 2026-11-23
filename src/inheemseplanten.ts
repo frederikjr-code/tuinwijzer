@@ -1,0 +1,110 @@
+// Top 100 inheemse planten van Nederland — bron: Tuinplantenloods.nl (blog, 24 februari 2026).
+// Uit de bron: Nederlandse en Latijnse naam en de groepsindeling (98 unieke soorten).
+// Snoeimaanden en -tips zijn toegevoegd op basis van algemene tuinpraktijk (niet uit de bron).
+
+export type InheemsePlantGroep = 'Varens' | 'Grassen & zeggen' | 'Vaste planten & kruiden' | 'Water & oever' | 'Bomen' | 'Heesters' | 'Hagen';
+
+export type InheemsePlant = {
+  id: string;
+  name: string;
+  latin: string;
+  group: InheemsePlantGroep;
+  months: number[]; // snoeimaanden; [] = geen snoei nodig
+  tip: string;
+};
+
+/** Nieuwe planten, allemaal inheems. */
+export const INHEEMSE_PLANTEN: InheemsePlant[] = [
+  { id: "asplenium-scolopendrium", name: "Tongvaren", latin: "Asplenium scolopendrium", group: "Varens", months: [3], tip: "Wintergroene varen: knip in maart alleen het oude, lelijke blad weg." },
+  { id: "dryopteris-dilatata", name: "Brede stekelvaren", latin: "Dryopteris dilatata", group: "Varens", months: [3], tip: "Knip in maart het oude, afgestorven blad weg voordat het nieuwe blad uitloopt." },
+  { id: "blechnum-spicant", name: "Dubbelloof", latin: "Blechnum spicant", group: "Varens", months: [3], tip: "Wintergroene varen: knip in maart alleen het oude, lelijke blad weg." },
+  { id: "equisetum-arvense", name: "Heermoes", latin: "Equisetum arvense", group: "Varens", months: [], tip: "Let op: woekert sterk via wortelstokken of uitlopers. Plant hem alleen in een pot of een afgeschermde plek; snoeien is niet nodig." },
+  { id: "ophioglossum-vulgatum", name: "Addertong", latin: "Ophioglossum vulgatum", group: "Varens", months: [], tip: "Snoeien is niet nodig. Laat het blad na de bloei vanzelf afsterven." },
+  { id: "osmunda-regalis", name: "Koningsvaren", latin: "Osmunda regalis", group: "Varens", months: [3], tip: "Knip in maart het oude, afgestorven blad weg voordat het nieuwe blad uitloopt." },
+  { id: "polypodium-vulgare", name: "Gewone eikvaren", latin: "Polypodium vulgare", group: "Varens", months: [3], tip: "Wintergroene varen: knip in maart alleen het oude, lelijke blad weg." },
+  { id: "pteridium-aquilinum", name: "Adelaarsvaren", latin: "Pteridium aquilinum", group: "Varens", months: [], tip: "Let op: woekert sterk via wortelstokken of uitlopers. Daarnaast giftig. Alleen geschikt voor grote, natuurlijke tuinen." },
+  { id: "botrychium-lunaria", name: "Gelobde maanvaren", latin: "Botrychium lunaria", group: "Varens", months: [], tip: "Snoeien is niet nodig. Laat het blad na de bloei vanzelf afsterven." },
+  { id: "dryopteris-filix-mas", name: "Mannetjesvaren", latin: "Dryopteris filix-mas", group: "Varens", months: [3], tip: "Knip in maart het oude, afgestorven blad weg voordat het nieuwe blad uitloopt." },
+  { id: "deschampsia-cespitosa", name: "Ruwe smele", latin: "Deschampsia cespitosa", group: "Grassen & zeggen", months: [3], tip: "Knip in maart terug tot zo'n 10 cm, voordat het nieuwe gras uitloopt." },
+  { id: "festuca-ovina", name: "Schapengras", latin: "Festuca ovina", group: "Grassen & zeggen", months: [3], tip: "Wintergroen: niet terugknippen, kam in maart alleen het dode blad eruit." },
+  { id: "agrostis-capillaris", name: "Gewoon struisgras", latin: "Agrostis capillaris", group: "Grassen & zeggen", months: [6, 9], tip: "Hoort in een bloemrijk grasland: maai 1 à 2 keer per jaar (rond juni en september) en voer het maaisel af." },
+  { id: "carex-nigra", name: "Zwarte zegge", latin: "Carex nigra", group: "Grassen & zeggen", months: [3], tip: "Wintergroen: niet terugknippen, kam in maart alleen het dode blad eruit." },
+  { id: "juncus-effusus", name: "Pitrus", latin: "Juncus effusus", group: "Grassen & zeggen", months: [3], tip: "Knip in maart de oude, bruine stengels bij de grond weg." },
+  { id: "holcus-lanatus", name: "Gestreepte witbol", latin: "Holcus lanatus", group: "Grassen & zeggen", months: [6, 9], tip: "Hoort in een bloemrijk grasland: maai 1 à 2 keer per jaar (rond juni en september) en voer het maaisel af." },
+  { id: "anthoxanthum-odoratum", name: "Gewoon reukgras", latin: "Anthoxanthum odoratum", group: "Grassen & zeggen", months: [6, 9], tip: "Hoort in een bloemrijk grasland: maai 1 à 2 keer per jaar (rond juni en september) en voer het maaisel af." },
+  { id: "poa-pratensis", name: "Veldbeemdgras", latin: "Poa pratensis", group: "Grassen & zeggen", months: [6, 9], tip: "Hoort in een bloemrijk grasland: maai 1 à 2 keer per jaar (rond juni en september) en voer het maaisel af." },
+  { id: "festuca-rubra", name: "Rood zwenkgras", latin: "Festuca rubra", group: "Grassen & zeggen", months: [3], tip: "Wintergroen: niet terugknippen, kam in maart alleen het dode blad eruit." },
+  { id: "carex-flacca", name: "Blauwe zegge", latin: "Carex flacca", group: "Grassen & zeggen", months: [3], tip: "Wintergroen: niet terugknippen, kam in maart alleen het dode blad eruit." },
+  { id: "anemone-nemorosa", name: "Bosanemoon", latin: "Anemone nemorosa", group: "Vaste planten & kruiden", months: [], tip: "Snoeien is niet nodig. Laat het blad na de bloei vanzelf afsterven." },
+  { id: "anthriscus-sylvestris", name: "Fluitenkruid", latin: "Anthriscus sylvestris", group: "Vaste planten & kruiden", months: [7], tip: "Knip na de bloei de uitgebloeide stengels weg als je niet wilt dat hij zich overal uitzaait." },
+  { id: "aquilegia-vulgaris", name: "Wilde akelei", latin: "Aquilegia vulgaris", group: "Vaste planten & kruiden", months: [7], tip: "Knip na de bloei de uitgebloeide stengels weg als je niet wilt dat hij zich overal uitzaait." },
+  { id: "armeria-maritima", name: "Engels gras", latin: "Armeria maritima", group: "Vaste planten & kruiden", months: [7], tip: "Knip direct na de bloei licht terug, dan blijft de plant compact." },
+  { id: "campanula-rotundifolia", name: "Grasklokje", latin: "Campanula rotundifolia", group: "Vaste planten & kruiden", months: [3], tip: "Laat de uitgebloeide stengels in de winter staan voor insecten en vogels. Knip ze in maart terug tot net boven de grond." },
+  { id: "cardamine-pratensis", name: "Pinksterbloem", latin: "Cardamine pratensis", group: "Vaste planten & kruiden", months: [6, 9], tip: "Hoort in een bloemrijk grasland: maai 1 à 2 keer per jaar (rond juni en september) en voer het maaisel af." },
+  { id: "centaurea-jacea", name: "Knoopkruid", latin: "Centaurea jacea", group: "Vaste planten & kruiden", months: [9], tip: "Hoort in een bloemrijk grasland: maai pas na de bloei, rond september, en voer het maaisel af." },
+  { id: "digitalis-purpurea", name: "Vingerhoedskruid", latin: "Digitalis purpurea", group: "Vaste planten & kruiden", months: [8], tip: "Tweejarig en giftig. Knip na de bloei de stengels weg, of laat er één staan zodat hij zich uitzaait." },
+  { id: "origanum-vulgare", name: "Wilde marjolein", latin: "Origanum vulgare", group: "Vaste planten & kruiden", months: [3], tip: "Laat de uitgebloeide stengels in de winter staan voor insecten en vogels. Knip ze in maart terug tot net boven de grond." },
+  { id: "primula-veris", name: "Gulden sleutelbloem", latin: "Primula veris", group: "Vaste planten & kruiden", months: [], tip: "Snoeien is niet nodig. Laat het blad na de bloei vanzelf afsterven." },
+  { id: "ranunculus-acris", name: "Scherpe boterbloem", latin: "Ranunculus acris", group: "Vaste planten & kruiden", months: [6, 9], tip: "Hoort in een bloemrijk grasland: maai 1 à 2 keer per jaar (rond juni en september) en voer het maaisel af." },
+  { id: "rhinanthus-minor", name: "Kleine ratelaar", latin: "Rhinanthus minor", group: "Vaste planten & kruiden", months: [7], tip: "Eenjarig en remt gras: maai pas als het zaad rijp is (vanaf juli), dan komt hij terug." },
+  { id: "silene-dioica", name: "Dagkoekoeksbloem", latin: "Silene dioica", group: "Vaste planten & kruiden", months: [3, 6], tip: "Knip na de eerste bloei terug, dan bloeit hij vaak nog een keer. In maart de rest opruimen." },
+  { id: "taraxacum-officinale", name: "Paardenbloem", latin: "Taraxacum officinale", group: "Vaste planten & kruiden", months: [], tip: "Snoeien is niet nodig. Knip uitgebloeide bloemen weg als je niet wilt dat hij zich uitzaait." },
+  { id: "thymus-praecox", name: "Wilde tijm", latin: "Thymus praecox", group: "Vaste planten & kruiden", months: [8], tip: "Knip direct na de bloei licht terug, dan blijft de plant compact." },
+  { id: "trifolium-pratense", name: "Rode klaver", latin: "Trifolium pratense", group: "Vaste planten & kruiden", months: [6, 9], tip: "Hoort in een bloemrijk grasland: maai 1 à 2 keer per jaar (rond juni en september) en voer het maaisel af." },
+  { id: "veronica-chamaedrys", name: "Gewone ereprijs", latin: "Veronica chamaedrys", group: "Vaste planten & kruiden", months: [], tip: "Snoeien is niet nodig. Laat het blad na de bloei vanzelf afsterven." },
+  { id: "vicia-cracca", name: "Vogelwikke", latin: "Vicia cracca", group: "Vaste planten & kruiden", months: [9], tip: "Hoort in een bloemrijk grasland: maai pas na de bloei, rond september, en voer het maaisel af." },
+  { id: "stachys-sylvatica", name: "Bosandoorn", latin: "Stachys sylvatica", group: "Vaste planten & kruiden", months: [3], tip: "Laat de uitgebloeide stengels in de winter staan voor insecten en vogels. Knip ze in maart terug tot net boven de grond." },
+  { id: "bellis-perennis", name: "Madeliefje", latin: "Bellis perennis", group: "Vaste planten & kruiden", months: [], tip: "Snoeien is niet nodig; hij groeit gewoon mee in het gazon." },
+  { id: "pulmonaria-officinalis", name: "Gevlekt longkruid", latin: "Pulmonaria officinalis", group: "Vaste planten & kruiden", months: [5], tip: "Knip na de bloei de oude bloemstengels en het lelijke blad weg; er komt vers blad voor terug." },
+  { id: "lathyrus-pratensis", name: "Veldlathyrus", latin: "Lathyrus pratensis", group: "Vaste planten & kruiden", months: [9], tip: "Hoort in een bloemrijk grasland: maai pas na de bloei, rond september, en voer het maaisel af." },
+  { id: "hypericum-perforatum", name: "Sint-janskruid", latin: "Hypericum perforatum", group: "Vaste planten & kruiden", months: [3], tip: "Laat de uitgebloeide stengels in de winter staan voor insecten en vogels. Knip ze in maart terug tot net boven de grond." },
+  { id: "lotus-corniculatus", name: "Gewone rolklaver", latin: "Lotus corniculatus", group: "Vaste planten & kruiden", months: [6, 9], tip: "Hoort in een bloemrijk grasland: maai 1 à 2 keer per jaar (rond juni en september) en voer het maaisel af." },
+  { id: "plantago-major", name: "Grote weegbree", latin: "Plantago major", group: "Vaste planten & kruiden", months: [], tip: "Snoeien is niet nodig; hij groeit vanzelf in paden en gazon." },
+  { id: "tussilago-farfara", name: "Klein hoefblad", latin: "Tussilago farfara", group: "Vaste planten & kruiden", months: [], tip: "Let op: woekert sterk via wortelstokken of uitlopers. Snoeien is niet nodig." },
+  { id: "silene-latifolia", name: "Avondkoekoeksbloem", latin: "Silene latifolia", group: "Vaste planten & kruiden", months: [3], tip: "Laat de uitgebloeide stengels in de winter staan voor insecten en vogels. Knip ze in maart terug tot net boven de grond." },
+  { id: "saxifraga-granulata", name: "Knolsteenbreek", latin: "Saxifraga granulata", group: "Vaste planten & kruiden", months: [], tip: "Snoeien is niet nodig. Laat het blad na de bloei vanzelf afsterven." },
+  { id: "persicaria-bistorta", name: "Adderwortel", latin: "Persicaria bistorta", group: "Vaste planten & kruiden", months: [3], tip: "Laat de uitgebloeide stengels in de winter staan voor insecten en vogels. Knip ze in maart terug tot net boven de grond." },
+  { id: "aegopodium-podagraria", name: "Zevenblad", latin: "Aegopodium podagraria", group: "Vaste planten & kruiden", months: [], tip: "Let op: woekert sterk via wortelstokken of uitlopers. Is daarna lastig weg te krijgen; plant hem alleen waar hij mag uitgroeien." },
+  { id: "carduus-crispus", name: "Kruldistel", latin: "Carduus crispus", group: "Vaste planten & kruiden", months: [8], tip: "Knip na de bloei de uitgebloeide stengels weg als je niet wilt dat hij zich overal uitzaait." },
+  { id: "euphorbia-cyparissias", name: "Cipreswolfsmelk", latin: "Euphorbia cyparissias", group: "Vaste planten & kruiden", months: [7], tip: "Let op: woekert sterk via wortelstokken of uitlopers. Knip na de bloei licht terug en draag handschoenen: het melksap irriteert de huid." },
+  { id: "succisa-pratensis", name: "Blauwe knoop", latin: "Succisa pratensis", group: "Vaste planten & kruiden", months: [9], tip: "Hoort in een bloemrijk grasland: maai pas na de bloei, rond september, en voer het maaisel af." },
+  { id: "sanguisorba-officinalis", name: "Grote pimpernel", latin: "Sanguisorba officinalis", group: "Vaste planten & kruiden", months: [3], tip: "Laat de uitgebloeide stengels in de winter staan voor insecten en vogels. Knip ze in maart terug tot net boven de grond." },
+  { id: "verbascum-nigrum", name: "Zwarte toorts", latin: "Verbascum nigrum", group: "Vaste planten & kruiden", months: [3], tip: "Laat de uitgebloeide stengels in de winter staan voor insecten en vogels. Knip ze in maart terug tot net boven de grond." },
+  { id: "thymus-pulegioides", name: "Grote tijm", latin: "Thymus pulegioides", group: "Vaste planten & kruiden", months: [8], tip: "Knip direct na de bloei licht terug, dan blijft de plant compact." },
+  { id: "potentilla-anserina", name: "Zilverschoon", latin: "Potentilla anserina", group: "Vaste planten & kruiden", months: [], tip: "Let op: woekert sterk via wortelstokken of uitlopers. Snoeien is niet nodig; knip te lange uitlopers weg." },
+  { id: "prunella-vulgaris", name: "Gewone brunel", latin: "Prunella vulgaris", group: "Vaste planten & kruiden", months: [3], tip: "Laat de uitgebloeide stengels in de winter staan voor insecten en vogels. Knip ze in maart terug tot net boven de grond." },
+  { id: "malva-moschata", name: "Muskuskaasjeskruid", latin: "Malva moschata", group: "Vaste planten & kruiden", months: [3], tip: "Laat de uitgebloeide stengels in de winter staan voor insecten en vogels. Knip ze in maart terug tot net boven de grond." },
+  { id: "echium-vulgare", name: "Slangenkruid", latin: "Echium vulgare", group: "Vaste planten & kruiden", months: [9], tip: "Tweejarig: knip na de bloei de stengels weg, of laat ze staan zodat hij zich uitzaait." },
+  { id: "dianthus-superbus", name: "Prachtanjer", latin: "Dianthus superbus", group: "Vaste planten & kruiden", months: [9], tip: "Knip direct na de bloei licht terug, dan blijft de plant compact." },
+  { id: "cruciata-laevipes", name: "Kruisbladwalstro", latin: "Cruciata laevipes", group: "Vaste planten & kruiden", months: [], tip: "Snoeien is niet nodig. Laat het blad na de bloei vanzelf afsterven." },
+  { id: "campanula-rapunculoides", name: "Akkerklokje", latin: "Campanula rapunculoides", group: "Vaste planten & kruiden", months: [3], tip: "Let op: woekert sterk via wortelstokken of uitlopers. Knip in maart de oude stengels weg." },
+  { id: "allium-ursinum", name: "Daslook", latin: "Allium ursinum", group: "Vaste planten & kruiden", months: [], tip: "Snoeien is niet nodig. Let op bij het plukken: het blad lijkt op dat van het giftige lelietje-van-dalen." },
+  { id: "lysimachia-nummularia", name: "Penningkruid", latin: "Lysimachia nummularia", group: "Vaste planten & kruiden", months: [], tip: "Snoeien is niet nodig; knip te lange uitlopers weg." },
+  { id: "salvia-pratensis", name: "Veldsalie", latin: "Salvia pratensis", group: "Vaste planten & kruiden", months: [3, 7], tip: "Knip na de eerste bloei terug, dan bloeit hij vaak nog een keer. In maart de rest opruimen." },
+  { id: "saponaria-officinalis", name: "Zeepkruid", latin: "Saponaria officinalis", group: "Vaste planten & kruiden", months: [3], tip: "Let op: woekert sterk via wortelstokken of uitlopers. Knip in maart de oude stengels weg." },
+  { id: "valeriana-officinalis", name: "Echte valeriaan", latin: "Valeriana officinalis", group: "Vaste planten & kruiden", months: [8], tip: "Knip na de bloei de uitgebloeide stengels weg als je niet wilt dat hij zich overal uitzaait." },
+  { id: "eupatorium-cannabinum", name: "Koninginnekruid", latin: "Eupatorium cannabinum", group: "Vaste planten & kruiden", months: [3], tip: "Laat de uitgebloeide stengels in de winter staan voor insecten en vogels. Knip ze in maart terug tot net boven de grond." },
+  { id: "lychnis-flos-cuculi", name: "Echte koekoeksbloem", latin: "Lychnis flos-cuculi", group: "Vaste planten & kruiden", months: [3], tip: "Laat de uitgebloeide stengels in de winter staan voor insecten en vogels. Knip ze in maart terug tot net boven de grond." },
+  { id: "cichorium-intybus", name: "Wilde cichorei", latin: "Cichorium intybus", group: "Vaste planten & kruiden", months: [3], tip: "Laat de uitgebloeide stengels in de winter staan voor insecten en vogels. Knip ze in maart terug tot net boven de grond." },
+  { id: "mentha-aquatica", name: "Watermunt", latin: "Mentha aquatica", group: "Water & oever", months: [3], tip: "Let op: woekert sterk via wortelstokken of uitlopers. Knip in maart de oude stengels weg; plant hem in een mand." },
+  { id: "iris-pseudacorus", name: "Gele lis", latin: "Iris pseudacorus", group: "Water & oever", months: [3], tip: "Knip in maart de afgestorven stengels weg. Laat ze in de winter staan: ze geven insecten beschutting." },
+  { id: "alisma-plantago-aquatica", name: "Grote waterweegbree", latin: "Alisma plantago-aquatica", group: "Water & oever", months: [8], tip: "Knip na de bloei de zaadstengels weg als je niet wilt dat hij zich uitzaait." },
+  { id: "typha-latifolia", name: "Grote lisdodde", latin: "Typha latifolia", group: "Water & oever", months: [3], tip: "Let op: woekert sterk via wortelstokken of uitlopers. Plant hem in een mand of alleen in een grote vijver. Knip in maart de oude stengels weg." },
+  { id: "butomus-umbellatus", name: "Zwanenbloem", latin: "Butomus umbellatus", group: "Water & oever", months: [3], tip: "Knip in maart de afgestorven stengels weg. Laat ze in de winter staan: ze geven insecten beschutting." },
+  { id: "filipendula-ulmaria", name: "Moerasspirea", latin: "Filipendula ulmaria", group: "Water & oever", months: [3], tip: "Knip in maart de afgestorven stengels weg. Laat ze in de winter staan: ze geven insecten beschutting." },
+  { id: "myosotis-scorpioides", name: "Moerasvergeet-mij-nietje", latin: "Myosotis scorpioides", group: "Water & oever", months: [], tip: "Snoeien is niet nodig. Laat het blad na de bloei vanzelf afsterven." },
+  { id: "phragmites-australis", name: "Riet", latin: "Phragmites australis", group: "Water & oever", months: [3], tip: "Let op: woekert sterk via wortelstokken of uitlopers. Alleen geschikt voor grote vijvers of met een stevige wortelbegrenzing. Knip in maart de oude stengels weg." },
+  { id: "veronica-beccabunga", name: "Beekpunge", latin: "Veronica beccabunga", group: "Water & oever", months: [], tip: "Snoeien is niet nodig. Laat het blad na de bloei vanzelf afsterven." },
+  { id: "quercus-robur", name: "Zomereik", latin: "Quercus robur", group: "Bomen", months: [12, 1, 2], tip: "Een boom hoeft meestal niet gesnoeid te worden. Haal alleen dood of storend hout weg in de winterrust." },
+  { id: "betula-pendula", name: "Ruwe berk", latin: "Betula pendula", group: "Bomen", months: [8, 9], tip: "Snoei alleen als het nodig is, in de nazomer. In het voorjaar 'bloedt' een berk veel sap." },
+  { id: "alnus-glutinosa", name: "Zwarte els", latin: "Alnus glutinosa", group: "Bomen", months: [12, 1, 2], tip: "Een boom hoeft meestal niet gesnoeid te worden. Haal alleen dood of storend hout weg in de winterrust." },
+  { id: "fraxinus-excelsior", name: "Gewone es", latin: "Fraxinus excelsior", group: "Bomen", months: [12, 1, 2], tip: "Een boom hoeft meestal niet gesnoeid te worden. Haal alleen dood of storend hout weg in de winterrust." },
+  { id: "prunus-spinosa", name: "Sleedoorn", latin: "Prunus spinosa", group: "Heesters", months: [2], tip: "Let op: woekert sterk via wortelstokken of uitlopers. Dun in februari de oudste takken uit. Draag handschoenen vanwege de doorns." },
+  { id: "crataegus-monogyna", name: "Meidoorn", latin: "Crataegus monogyna", group: "Hagen", months: [6, 9], tip: "Als haag knippen na de bloei en in september. Controleer eerst op vogelnesten." },
+  { id: "corylus-avellana", name: "Hazelaar", latin: "Corylus avellana", group: "Heesters", months: [2, 3], tip: "Haal na de bloei van de katjes de oudste takken bij de grond weg; zo blijft hij jong en vitaal." },
+  { id: "malus-sylvestris", name: "Wilde appel", latin: "Malus sylvestris", group: "Bomen", months: [12, 1, 2], tip: "Wintersnoei bij vorstvrij weer: dood, kruisend en naar binnen groeiend hout weghalen." },
+  { id: "hippophae-rhamnoides", name: "Duindoorn", latin: "Hippophae rhamnoides", group: "Heesters", months: [2], tip: "Let op: woekert sterk via wortelstokken of uitlopers. Snoei in februari licht terug. Voor bessen heb je een mannelijke en een vrouwelijke plant nodig." },
+];
+
+/** Planten die al in de app staan (PLANTS of VASTE_PLANTEN) en ook inheems zijn: alleen label toevoegen. */
+export const OOK_INHEEMS: string[] = ["achillea-millefolium", "ajuga-reptans", "caltha-palustris", "dianthus-deltoides", "geranium-pratense", "leucanthemum-vulgare", "fragaria-vesca", "lythrum-salicaria", "beuk"];

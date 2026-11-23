@@ -1,15 +1,41 @@
 // Snoeigegevens: algemene richtlijnen voor een Nederlandse tuin.
-// months = maanden (1-12) waarin je snoeit; tip = wat en hoe.
+// months = maanden (1-12) waarin je snoeit ([] = geen snoei nodig); tip = wat en hoe.
+// De lijst PLANTS hieronder voegt drie bronnen samen: de eigen basislijst, de top 100 vaste planten
+// (vasteplanten.ts) en de inheemse planten (inheemseplanten.ts).
+import { INHEEMSE_PLANTEN, OOK_INHEEMS } from './inheemseplanten';
+import { type Grond, type Licht, VASTE_PLANTEN } from './vasteplanten';
+
+export type { Grond, Licht };
+
+export const GROUPS = [
+  'Heesters',
+  'Hagen',
+  'Bomen',
+  'Fruit',
+  'Klimplanten',
+  'Vaste planten & kruiden',
+  'Varens',
+  'Grassen & zeggen',
+  'Water & oever',
+] as const;
 
 export type Plant = {
   id: string;
   name: string;
-  group: 'Heesters' | 'Hagen' | 'Fruit' | 'Klimplanten' | 'Vaste planten & kruiden';
+  group: (typeof GROUPS)[number];
   months: number[];
   tip: string;
+  latin?: string;
+  light?: Licht[];
+  soil?: Grond[];
+  /** hoogte in cm, bijvoorbeeld "60" of "70-90" */
+  height?: string;
+  /** bloeimaanden 1-12 */
+  bloom?: number[];
+  inheems?: boolean;
 };
 
-export const PLANTS: Plant[] = [
+const BASE_PLANTS: Plant[] = [
   // Heesters
   { id: 'boerenhortensia', name: 'Boerenhortensia', group: 'Heesters', months: [3, 4], tip: 'Alleen uitgebloeide bloemen wegknippen tot boven het eerste paar dikke knoppen. Niet hard terugsnoeien, dan bloeit hij niet.' },
   { id: 'pluimhortensia', name: 'Pluimhortensia', group: 'Heesters', months: [2, 3], tip: 'Flink terugsnoeien tot 2 à 3 paar knoppen boven de grond. Bloeit op nieuw hout.' },
@@ -52,10 +78,69 @@ export const PLANTS: Plant[] = [
   { id: 'siergras', name: 'Siergras', group: 'Vaste planten & kruiden', months: [3], tip: 'Terugknippen tot zo\'n 10–15 cm voordat het nieuwe gras uitloopt. Wintergroene soorten alleen uitkammen.' },
 ];
 
+/** Alle planten: basislijst + vaste planten + inheemse planten, met inheems-label waar dat klopt. */
+export const PLANTS: Plant[] = (() => {
+  const list: Plant[] = BASE_PLANTS.map((p) => ({ ...p }));
+  const byId = new Map(list.map((p) => [p.id, p]));
+
+  for (const v of VASTE_PLANTEN) {
+    const props = { latin: v.latin, light: v.light, soil: v.soil, height: v.height, bloom: v.bloom };
+    if (v.months === null) {
+      // Bestaat al (lavendel, rozemarijn): alleen eigenschappen toevoegen, snoeimaanden en tip blijven.
+      const p = byId.get(v.id);
+      if (p) Object.assign(p, props);
+      else if (import.meta.env.DEV) console.error(`vasteplanten: "${v.id}" heeft months: null maar bestaat niet`);
+      continue;
+    }
+    const p: Plant = { id: v.id, name: v.name, group: 'Vaste planten & kruiden', months: v.months, tip: v.tip ?? '', ...props };
+    list.push(p);
+    byId.set(p.id, p);
+  }
+
+  for (const i of INHEEMSE_PLANTEN) {
+    const p: Plant = { id: i.id, name: i.name, latin: i.latin, group: i.group, months: i.months, tip: i.tip, inheems: true };
+    list.push(p);
+    byId.set(p.id, p);
+  }
+
+  for (const id of OOK_INHEEMS) {
+    const p = byId.get(id);
+    if (p) p.inheems = true;
+    else if (import.meta.env.DEV) console.error(`OOK_INHEEMS: "${id}" bestaat niet`);
+  }
+
+  // Dubbele id's zouden keuzes in localStorage door elkaar halen.
+  const seen = new Set<string>();
+  for (const p of list) {
+    if (seen.has(p.id)) throw new Error(`Dubbele plant-id: ${p.id}`);
+    seen.add(p.id);
+  }
+  return list;
+})();
+
+/** "juni t/m augustus" of "maart, mei en juli t/m september"; loopt door over de jaarwisseling. */
+export function monthRanges(months: number[]): string {
+  const ms = [...new Set(months)].sort((a, b) => a - b);
+  if (ms.length === 12) return 'het hele jaar';
+  const runs: number[][] = [];
+  for (const m of ms) {
+    const last = runs[runs.length - 1];
+    if (last && m === last[last.length - 1] + 1) last.push(m);
+    else runs.push([m]);
+  }
+  if (runs.length > 1 && runs[0][0] === 1 && runs[runs.length - 1][runs[runs.length - 1].length - 1] === 12) runs[0] = [...runs.pop()!, ...runs[0]];
+  // Twee maanden achter elkaar lezen beter als losse maanden ("maart en april").
+  const parts = runs.flatMap((r) =>
+    r.length === 1 ? [MONTHS_LONG[r[0] - 1]] : r.length === 2 ? r.map((m) => MONTHS_LONG[m - 1]) : [`${MONTHS_LONG[r[0] - 1]} t/m ${MONTHS_LONG[r[r.length - 1] - 1]}`],
+  );
+  return parts.length < 2 ? parts.join('') : `${parts.slice(0, -1).join(', ')} en ${parts[parts.length - 1]}`;
+}
+
 export const MONTHS = ['jan', 'feb', 'mrt', 'apr', 'mei', 'jun', 'jul', 'aug', 'sep', 'okt', 'nov', 'dec'];
 export const MONTHS_LONG = ['januari', 'februari', 'maart', 'april', 'mei', 'juni', 'juli', 'augustus', 'september', 'oktober', 'november', 'december'];
 
-/** Maakt een .ics-bestand met een jaarlijks terugkerende herinnering per plant per snoeimaand. */
+/** Maakt een .ics-bestand met een jaarlijks terugkerende herinnering per plant per snoeimaand.
+ *  Planten zonder snoeimaanden (months: []) leveren geen afspraken op. */
 export function buildIcs(plants: Plant[]): string {
   const year = new Date().getFullYear();
   const now = new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');

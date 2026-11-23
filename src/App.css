@@ -50,10 +50,10 @@ p { margin: 0; }
   box-shadow: 0 16px 40px rgb(20 48 42 / 0.16); /* het enige zwevende element */
   display: flex; flex-direction: column; gap: 2px;
 }
-.popover input, .picker input {
+.popover input, .picker > input {
   width: 100%; padding: 10px 12px; border: 1px solid var(--line-strong); border-radius: 10px; background: var(--surface);
 }
-.popover input:focus-visible, .picker input:focus-visible { outline-offset: 0; border-color: var(--rain); }
+.popover input:focus-visible, .picker > input:focus-visible { outline-offset: 0; border-color: var(--rain); }
 .hit { text-align: left; background: none; border: 0; padding: 9px 10px; border-radius: 8px; cursor: pointer; }
 .hit:hover { background: var(--bg); }
 .locate { color: var(--rain); font-weight: 600; border-top: 1px solid var(--line); border-radius: 0 0 8px 8px; margin-top: 4px; }
@@ -187,7 +187,8 @@ p { margin: 0; }
 .row.head > span { border-top: 0; font-size: 13px; color: var(--muted); padding: 7px 2px; }
 .row.head > span:not(.pname) { border-radius: var(--r-sm) var(--r-sm) 0 0; }
 .row:last-child > span { border-bottom: 1px solid var(--line); }
-.row .pname { justify-content: flex-start; padding-left: 0; padding-right: 10px; font-size: 15px; position: sticky; left: 0; background: var(--bg); z-index: 1; }
+.row .pname { flex-direction: column; align-items: flex-start; justify-content: center; padding-left: 0; padding-right: 10px; font-size: 15px; position: sticky; left: 0; background: var(--bg); z-index: 2; line-height: 1.25; }
+.nocut { font-size: 12.5px; color: var(--muted); }
 .s-w { background: var(--tint-w); }
 .s-l { background: var(--tint-l); }
 .s-z { background: var(--tint-z); }
@@ -195,13 +196,89 @@ p { margin: 0; }
 .row > .cur { box-shadow: inset 2px 0 0 var(--ink), inset -2px 0 0 var(--ink); }
 .row.head > .cur { background: var(--ink); color: #fff; font-weight: 700; }
 .row:last-child > .cur { box-shadow: inset 2px 0 0 var(--ink), inset -2px 0 0 var(--ink), inset 0 -2px 0 var(--ink); }
-.cut { display: inline-block; width: 16px; height: 16px; border-radius: 5px; background: var(--ink); }
+.cut { display: inline-block; width: 16px; height: 16px; border-radius: 5px; background: var(--ink); position: relative; z-index: 1; }
+
+/* bloeimaanden: een lichte balk door de cellen heen */
+.row > span.bl { position: relative; }
+.row > span.bl::before { content: ''; position: absolute; left: 0; right: 0; top: 50%; height: 10px; transform: translateY(-50%); background: var(--bloom); }
+.row > span.bl-s::before { left: 3px; border-top-left-radius: 5px; border-bottom-left-radius: 5px; }
+.row > span.bl-e::before { right: 3px; border-top-right-radius: 5px; border-bottom-right-radius: 5px; }
+.ylegend { display: flex; gap: 18px; font-size: 14px; color: var(--muted); margin-bottom: 8px; }
+.ylegend > span { display: inline-flex; align-items: center; gap: 7px; }
+.ylegend .cut { width: 12px; height: 12px; border-radius: 4px; }
+.bloom-sw { display: inline-block; width: 24px; height: 9px; border-radius: 5px; background: var(--bloom); }
+
+/* gekozen planten met hun eigenschappen */
+.pcards { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 0 28px; }
+.pcard { padding: 14px 0; border-top: 1px solid var(--line); }
+.pc-head { display: flex; align-items: baseline; flex-wrap: wrap; gap: 2px 6px; }
+.pcard .latin { display: block; margin-top: 1px; }
+.facts { margin: 8px 0 0; display: grid; grid-template-columns: auto 1fr; gap: 2px 12px; font-size: 14px; }
+.facts > div { display: contents; }
+.facts dt { color: var(--muted); }
+.facts dd { margin: 0; }
+.pcard .tiptext { margin-top: 8px; font-size: 14px; color: var(--muted); }
+
+/* tips die met "Let op:" beginnen */
+.tiptext.warn {
+  display: flex; gap: 8px; align-items: flex-start; color: var(--ink);
+  background: rgb(200 144 46 / 0.14); border-left: 3px solid var(--water-strong); border-radius: 0 8px 8px 0; padding: 8px 10px;
+}
+.tip .tiptext.warn { color: var(--ink); margin-top: 6px; }
+.tiptext.warn .ico { stroke: var(--water-text); flex: none; margin-top: 3px; }
+.tiptext.warn b { color: var(--water-text); }
+
+/* Latijnse naam en inheems-label */
+.latin { font-size: 12.5px; font-style: italic; color: var(--muted); }
+.tag {
+  display: inline-block; margin-left: 6px; padding: 0 7px; border-radius: 999px; vertical-align: 1px;
+  font-size: 11.5px; font-weight: 600; line-height: 1.6; color: var(--good-text); background: rgb(103 149 28 / 0.13);
+}
 
 .picker { margin-bottom: 6px; }
 .chips { display: flex; flex-wrap: wrap; gap: 6px; }
-.pchip { border: 1px solid var(--line-strong); background: var(--surface); border-radius: 999px; padding: 7px 13px; min-height: 38px; cursor: pointer; font-size: 15px; }
+.pchip {
+  display: inline-flex; flex-direction: column; align-items: flex-start; text-align: left; line-height: 1.3;
+  border: 1px solid var(--line-strong); background: var(--surface); border-radius: 14px; padding: 7px 13px; min-height: 38px; cursor: pointer; font-size: 15px;
+}
+.pchip .latin { margin-top: 1px; }
+.pchip.on .latin { color: rgb(255 255 255 / 0.8); }
+.pchip.on .tag { color: #fff; background: rgb(255 255 255 / 0.2); }
+
+/* filters en ingeklapte groepen in de plantenkiezer */
+.filters { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 24px; margin-top: 14px; }
+.fgroup { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 10px; }
+.flabel { font-size: 14px; color: var(--muted); }
+.fcheck { display: inline-flex; align-items: center; gap: 8px; font-size: 15px; cursor: pointer; }
+.fcheck input { width: 18px; height: 18px; margin: 0; accent-color: var(--ink); }
+.fcount { margin: 14px 0 6px; font-size: 14px; color: var(--muted); }
+.linkbtn { background: none; border: 0; padding: 0; color: var(--ink); text-decoration: underline; text-underline-offset: 3px; cursor: pointer; font: inherit; }
+.pgroup { border-top: 1px solid var(--line); }
+.pgroup:last-of-type { border-bottom: 1px solid var(--line); }
+.grp-head { display: flex; align-items: center; gap: 8px; width: 100%; background: none; border: 0; padding: 12px 0; cursor: pointer; text-align: left; color: var(--ink); }
+.grp-head:disabled { cursor: default; color: var(--ink); opacity: 1; }
+.grp-head .chev { transition: transform .15s; }
+.grp-head[aria-expanded='true'] .chev { transform: rotate(90deg); }
+.gname { font-weight: 650; font-size: 16px; }
+.gcount { margin-left: auto; font-size: 14px; color: var(--muted); text-align: right; }
+.pgroup .chips { padding-bottom: 16px; }
 .pchip:hover { border-color: var(--ink); }
 .pchip.on { background: var(--ink); border-color: var(--ink); color: #fff; }
+.nohit { margin-top: 12px; }
+
+/* ---------- plant voorstellen ---------- */
+.suggest { margin-top: 28px; padding-top: 18px; border-top: 1px solid var(--line); display: flex; align-items: center; justify-content: space-between; gap: 10px 16px; flex-wrap: wrap; }
+.suggest.form { display: grid; gap: 12px; justify-content: stretch; max-width: 520px; border-top: 0; background: rgb(255 255 255 / 0.55); border-radius: var(--r-md); padding: 16px; }
+.suggest .stitle { margin: 0; color: var(--ink); font-size: 17px; }
+.suggest label { display: grid; gap: 6px; font-size: 15px; font-weight: 600; }
+.suggest label .muted { font-weight: 400; }
+.suggest input, .suggest textarea {
+  width: 100%; padding: 10px 12px; border: 1px solid var(--line-strong); border-radius: 10px; background: var(--surface); font-weight: 400; resize: vertical;
+}
+.suggest input:focus-visible, .suggest textarea:focus-visible { outline-offset: 0; border-color: var(--rain); }
+.suggest .small { margin: 0; }
+.suggest .actions { margin-top: 4px; }
+.hp { position: absolute; left: -9999px; width: 1px; height: 1px; overflow: hidden; }
 
 .actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 28px; }
 .actions .btn { margin-top: 0; }
@@ -231,6 +308,11 @@ p { margin: 0; }
   .poster .row .pname { position: static; background: none; font-size: 11pt; font-weight: 600; }
   .poster .row.head > span { font-size: 10pt; color: var(--ink); }
   .poster .cut { width: 5mm; height: 5mm; border-radius: 1.4mm; }
+  .poster .nocut { font-size: 8pt; font-weight: 400; }
+  .poster .row > span.bl::before { height: 2.6mm; }
+  .poster .ylegend { font-size: 9pt; margin-bottom: 2mm; }
+  .poster-tips .pfacts { font-size: 8.5pt; color: var(--muted); }
+  .poster-tips .tiptext.warn { padding: 1mm 2mm; font-size: 8.5pt; }
 
   .poster-tips { list-style: none; margin: 6mm 0 0; padding: 0; columns: 3; column-gap: 7mm; font-size: 10pt; }
   .poster-tips li { break-inside: avoid; padding: 1mm 0 1mm 3mm; border-left: 1.2mm solid var(--good); margin-bottom: 2mm; }

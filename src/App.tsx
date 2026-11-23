@@ -1,11 +1,11 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { type FormEvent, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import './App.css';
-import { MONTHS, MONTHS_LONG, PLANTS, type Plant, buildIcs } from './plants';
+import { GROUPS, type Grond, type Licht, MONTHS, MONTHS_LONG, PLANTS, type Plant, buildIcs, monthRanges } from './plants';
 import {
   type Advice, type Day, DEFAULT_PLACE, GIETER_LITER, type Gift, type Place, SLANG_LITER_PER_MIN, type Status, type WaterUnit,
   addDays, dayPhrase, fetchWeather, isoToday, searchPlace, waterAdvice,
 } from './weather';
-import { AMOUNT_LABEL, type Amount, NORMAL_MM, giftMm, useGardenLog } from './gifts';
+import { NORMAL_MM, giftMm, useGardenLog } from './gifts';
 
 function load<T>(key: string, fallback: T): T {
   try {
@@ -60,6 +60,13 @@ export default function App() {
           Weerdata via <a href="https://open-meteo.com" target="_blank" rel="noreferrer">Open-Meteo</a>. Snoeiadvies is een
           algemene richtlijn, per soort en ras kan het afwijken. Je keuzes worden alleen in je eigen browser bewaard.
         </p>
+        <p>
+          Vaste planten: top 100 van Ron den Dikken, Levende Tuin Academie (
+          <a href="https://www.tuincursus.com" target="_blank" rel="noreferrer">tuincursus.com</a>). Inheemse planten:{' '}
+          <a href="https://www.tuinplantenloods.nl/blogs/nieuws/%F0%9F%8C%BF-top-100-inheemse-planten-van-nederland" target="_blank" rel="noreferrer">
+            Tuinplantenloods.nl
+          </a>.
+        </p>
         <p>Gebouwd door Frederik Vermeulen en gevibecodet met Claude.</p>
       </footer>
     </main>
@@ -105,7 +112,6 @@ function assumption(pastDates: string[], known: (d: string) => boolean): string 
 
 const STATUS_WORD: Record<Status, string> = { frost: 'Vorst', ok: 'Goed', water: 'Water geven', soon: 'Bijna droog' };
 const DAY_LABELS = ['Vandaag', 'Gisteren', 'Eergisteren'];
-const AMOUNTS: Amount[] = ['beetje', 'normaal', 'flink'];
 
 type Toast = { text: string; undo: () => void };
 
@@ -151,8 +157,8 @@ function Water({ place, setPlace }: { place: Place; setPlace: (p: Place) => void
       result.advice[0])
     : null;
 
-  const logGifts = (zones: string[], date: string, amount: Amount, extraUndo?: () => void) => {
-    const ids = log.addGifts(zones.map((zone) => ({ zone, date, amount })));
+  const logGifts = (zones: string[], date: string, extraUndo?: () => void) => {
+    const ids = log.addGifts(zones.map((zone) => ({ zone, date })));
     const when = date === today ? '' : ` (${dayPhrase(date, today)})`;
     setToast({ text: `Water gegeven bij ${joinNl(zones)}${when}`, undo: () => { log.removeGifts(ids); extraUndo?.(); } });
   };
@@ -193,9 +199,9 @@ function Water({ place, setPlace }: { place: Place; setPlace: (p: Place) => void
           {showCheckIn && (
             <CheckIn
               zones={result.advice.map((a) => a.zone)}
-              onYes={(zones, amount) => {
+              onYes={(zones) => {
                 log.addAnswer(yesterday);
-                logGifts(zones, yesterday, amount, () => log.removeAnswer(yesterday));
+                logGifts(zones, yesterday, () => log.removeAnswer(yesterday));
               }}
               onNo={() => {
                 log.addAnswer(yesterday);
@@ -214,7 +220,7 @@ function Water({ place, setPlace }: { place: Place; setPlace: (p: Place) => void
                     <span className={`zstatus ${a.status}`}>{STATUS_WORD[a.status]}</span>
                   </div>
                   <p>{a.text}</p>
-                  <ZoneLog zone={a.zone} onLog={(daysAgo, amount) => logGifts([a.zone], addDays(today, -daysAgo), amount)} />
+                  <ZoneLog zone={a.zone} onLog={(daysAgo) => logGifts([a.zone], addDays(today, -daysAgo))} />
                 </div>
               </li>
             ))}
@@ -223,7 +229,7 @@ function Water({ place, setPlace }: { place: Place; setPlace: (p: Place) => void
             {unit === 'gieter'
               ? `Uitgaande van een gieter van ${GIETER_LITER} liter.`
               : `Uitgaande van een tuinslang met sproeikop, die ongeveer ${SLANG_LITER_PER_MIN} liter per minuut geeft.`}
-            {' '}Een normale gift telt als {joinNl(Object.entries(NORMAL_MM).map(([z, v]) => `${v} mm bij ${z}`))}.
+            {' '}Elke gift telt als {joinNl(Object.entries(NORMAL_MM).map(([z, v]) => `${v} mm bij ${z}`))}.
           </p>
 
           <h3>Regen, verdamping en jouw water per dag</h3>
@@ -244,10 +250,9 @@ function Water({ place, setPlace }: { place: Place; setPlace: (p: Place) => void
 }
 
 /** Dagelijkse vraag over gisteren. Verdwijnt zodra er een antwoord (of een gift voor gisteren) is. */
-function CheckIn({ zones, onYes, onNo }: { zones: string[]; onYes: (zones: string[], amount: Amount) => void; onNo: () => void }) {
+function CheckIn({ zones, onYes, onNo }: { zones: string[]; onYes: (zones: string[]) => void; onNo: () => void }) {
   const [choosing, setChoosing] = useState(false);
   const [sel, setSel] = useState<string[]>([]);
-  const [amount, setAmount] = useState<Amount>('normaal');
   const toggle = (z: string) => setSel(sel.includes(z) ? sel.filter((x) => x !== z) : [...sel, z]);
 
   return (
@@ -271,12 +276,8 @@ function CheckIn({ zones, onYes, onNo }: { zones: string[]; onYes: (zones: strin
               </button>
             ))}
           </div>
-          <p className="mlabel">Hoeveel?</p>
-          <div className="seg" role="group" aria-label="Hoeveelheid">
-            {AMOUNTS.map((a) => <button key={a} aria-pressed={amount === a} onClick={() => setAmount(a)}>{AMOUNT_LABEL[a]}</button>)}
-          </div>
           <div className="actions">
-            <button className="btn" disabled={sel.length === 0} onClick={() => onYes(sel, amount)}>Opslaan</button>
+            <button className="btn" disabled={sel.length === 0} onClick={() => onYes(sel)}>Opslaan</button>
             <button className="btn ghost" onClick={() => setChoosing(false)}>Annuleren</button>
           </div>
         </div>
@@ -285,11 +286,10 @@ function CheckIn({ zones, onYes, onNo }: { zones: string[]; onYes: (zones: strin
   );
 }
 
-/** "Water gegeven": één tik is een normale gift vandaag; het pijltje opent dag en hoeveelheid. */
-function ZoneLog({ zone, onLog }: { zone: string; onLog: (daysAgo: number, amount: Amount) => void }) {
+/** "Water gegeven": één tik is een gift vandaag; via het pijltje kies je gisteren of eergisteren. */
+function ZoneLog({ zone, onLog }: { zone: string; onLog: (daysAgo: number) => void }) {
   const [open, setOpen] = useState(false);
   const [day, setDay] = useState(0);
-  const [amount, setAmount] = useState<Amount>('normaal');
   const box = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -304,11 +304,11 @@ function ZoneLog({ zone, onLog }: { zone: string; onLog: (daysAgo: number, amoun
   return (
     <div className="zlog" ref={box} onKeyDown={(e) => e.key === 'Escape' && setOpen(false)}>
       <div className="split">
-        <button className="chip" onClick={() => onLog(0, 'normaal')}>
+        <button className="chip" onClick={() => onLog(0)}>
           <svg viewBox="0 0 16 16" aria-hidden="true" className="ico"><path d="M8 2.5s4 4.3 4 7.2a4 4 0 0 1-8 0C4 6.8 8 2.5 8 2.5Z" /></svg>
           Water gegeven
         </button>
-        <button className="chip more" aria-expanded={open} aria-label={`Andere dag of hoeveelheid voor ${zone}`} onClick={() => setOpen(!open)}>
+        <button className="chip more" aria-expanded={open} aria-label={`Andere dag kiezen voor ${zone}`} onClick={() => setOpen(!open)}>
           <svg viewBox="0 0 16 16" aria-hidden="true" className="ico chev"><path d="m4 6 4 4 4-4" /></svg>
         </button>
       </div>
@@ -318,12 +318,8 @@ function ZoneLog({ zone, onLog }: { zone: string; onLog: (daysAgo: number, amoun
           <div className="seg" role="group" aria-label="Dag">
             {DAY_LABELS.map((l, i) => <button key={l} aria-pressed={day === i} onClick={() => setDay(i)}>{l}</button>)}
           </div>
-          <p className="mlabel">Hoeveel?</p>
-          <div className="seg" role="group" aria-label="Hoeveelheid">
-            {AMOUNTS.map((a) => <button key={a} aria-pressed={amount === a} onClick={() => setAmount(a)}>{AMOUNT_LABEL[a]}</button>)}
-          </div>
-          <button className="btn" onClick={() => { onLog(day, amount); setOpen(false); }}>
-            Opslaan ({new Intl.NumberFormat('nl-NL', { maximumFractionDigits: 1 }).format(giftMm(zone, amount))} mm)
+          <button className="btn" onClick={() => { onLog(day); setOpen(false); }}>
+            Opslaan ({giftMm(zone)} mm)
           </button>
         </div>
       )}
@@ -541,17 +537,21 @@ function RainChart({ days, gifts }: { days: Day[]; gifts: Gift[] }) {
 /* ---------------- Snoeikalender ---------------- */
 
 const SEASON = ['w', 'w', 'l', 'l', 'l', 'z', 'z', 'z', 'h', 'h', 'h', 'w'];
+const LIGHTS: Licht[] = ['zon', 'halfschaduw', 'schaduw'];
+const SOILS: Grond[] = ['droog', 'vochtig', 'nat'];
+const cap = (s: string) => s[0].toUpperCase() + s.slice(1);
 
 function Pruning({ mine, setMine }: { mine: string[]; setMine: (ids: string[]) => void }) {
   const [picking, setPicking] = useState(mine.length === 0);
   const month = new Date().getMonth() + 1;
   const next = (month % 12) + 1;
   const plants = PLANTS.filter((p) => mine.includes(p.id));
+  const pruned = plants.filter((p) => p.months.length > 0); // planten zonder snoei komen niet in de agenda
   const nowList = plants.filter((p) => p.months.includes(month));
   const nextList = plants.filter((p) => p.months.includes(next) && !p.months.includes(month));
 
   const download = () => {
-    const blob = new Blob([buildIcs(plants)], { type: 'text/calendar;charset=utf-8' });
+    const blob = new Blob([buildIcs(pruned)], { type: 'text/calendar;charset=utf-8' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
     a.download = 'snoeikalender.ics';
@@ -564,7 +564,7 @@ function Pruning({ mine, setMine }: { mine: string[]; setMine: (ids: string[]) =
       <div className="sechead">
         <h2 id="prune-h">Maak je eigen snoeikalender</h2>
         {picking ? (
-          <button className="chip primary" disabled={mine.length === 0} onClick={() => setPicking(false)}>Toon mijn kalender ({mine.length})</button>
+          <button className="chip primary" disabled={plants.length === 0} onClick={() => setPicking(false)}>Toon mijn kalender ({plants.length})</button>
         ) : (
           <button className="chip" onClick={() => setPicking(true)}>Planten aanpassen</button>
         )}
@@ -597,13 +597,17 @@ function Pruning({ mine, setMine }: { mine: string[]; setMine: (ids: string[]) =
           <h3>Het hele jaar</h3>
           <YearGrid plants={plants} month={month} />
 
+          <h3>Mijn planten</h3>
+          <ul className="pcards">{plants.map((p) => <PlantCard key={p.id} p={p} />)}</ul>
+
           <div className="actions">
             <button className="btn" onClick={() => window.print()}>Printen voor in de schuur</button>
-            <button className="btn ghost" onClick={download}>Zet in mijn agenda (.ics)</button>
+            <button className="btn ghost" onClick={download} disabled={pruned.length === 0}>Zet in mijn agenda (.ics)</button>
           </div>
           <p className="muted small">
-            De print past op één A4 liggend, met per plant wanneer en hoe je snoeit. De agenda werkt met Google Agenda, Outlook
+            De print is een A4 liggend, met per plant wanneer en hoe je snoeit; bij veel planten lopen de tips door op een tweede blad. De agenda werkt met Google Agenda, Outlook
             en Apple Agenda, en de herinneringen herhalen elk jaar op de 1e van de snoeimaand.
+            {pruned.length < plants.length && ' Planten die geen snoei nodig hebben, komen niet in de agenda.'}
           </p>
         </>
       )}
@@ -613,32 +617,81 @@ function Pruning({ mine, setMine }: { mine: string[]; setMine: (ids: string[]) =
   );
 }
 
-/** Jaaroverzicht: maandkolommen met seizoenstint. Zonder `month` geen markering (voor de print). */
+/**
+ * Jaaroverzicht: maandkolommen met seizoenstint, snoeimaanden als vakje en bloeimaanden als lichte balk.
+ * Zonder `month` geen markering van de huidige maand (voor de print).
+ */
 function YearGrid({ plants, month }: { plants: Plant[]; month?: number }) {
   const cls = (i: number) => `s-${SEASON[i]}${i + 1 === month ? ' cur' : ''}`;
   return (
-    <div className="grid12" tabIndex={0} aria-label="Snoeimaanden per plant">
-      <div className="row head">
-        <span className="pname" />
-        {MONTHS.map((m, i) => <span key={m} className={cls(i)} aria-current={i + 1 === month ? 'date' : undefined}>{m}</span>)}
+    <>
+      <div className="ylegend" aria-hidden="true">
+        <span><i className="cut" /> snoeien</span>
+        <span><i className="bloom-sw" /> bloei</span>
       </div>
-      {plants.map((p) => (
-        <div className="row" key={p.id} title={p.tip}>
-          <span className="pname">{p.name}</span>
-          {MONTHS.map((m, i) => (
-            <span key={m} className={cls(i)}>
-              {p.months.includes(i + 1) ? <i className="cut" aria-label={`snoeien in ${MONTHS_LONG[i]}`} /> : null}
-            </span>
-          ))}
+      <div className="grid12" tabIndex={0} aria-label="Snoei- en bloeimaanden per plant">
+        <div className="row head">
+          <span className="pname" />
+          {MONTHS.map((m, i) => <span key={m} className={cls(i)} aria-current={i + 1 === month ? 'date' : undefined}>{m}</span>)}
         </div>
-      ))}
-    </div>
+        {plants.map((p) => {
+          const blooms = (m: number) => !!p.bloom?.includes(m);
+          return (
+            <div className="row" key={p.id} title={p.tip}>
+              <span className="pname">
+                <span>{p.name}</span>
+                {p.months.length === 0 && <span className="nocut">Geen snoei nodig</span>}
+              </span>
+              {MONTHS.map((m, i) => {
+                const b = blooms(i + 1);
+                const bl = b ? ` bl${!blooms(i) || i === 0 ? ' bl-s' : ''}${!blooms(i + 2) || i === 11 ? ' bl-e' : ''}` : '';
+                const label = [p.months.includes(i + 1) && 'snoeien', b && 'bloei'].filter(Boolean).join(' en ');
+                return (
+                  <span key={m} className={cls(i) + bl} aria-label={label ? `${MONTHS_LONG[i]}: ${label}` : undefined}>
+                    {p.months.includes(i + 1) ? <i className="cut" /> : null}
+                  </span>
+                );
+              })}
+            </div>
+          );
+        })}
+      </div>
+    </>
   );
 }
 
-/** "maart, april en mei" */
-function joinNl(items: string[]) {
-  return items.length < 2 ? items.join('') : `${items.slice(0, -1).join(', ')} en ${items[items.length - 1]}`;
+/** "maart, april en mei" of met `of`: "zon of halfschaduw". */
+function joinNl(items: string[], word = 'en') {
+  return items.length < 2 ? items.join('') : `${items.slice(0, -1).join(', ')} ${word} ${items[items.length - 1]}`;
+}
+
+/** De bekende eigenschappen van een plant; onbekende velden laten we weg. */
+function plantFacts(p: Plant): [string, string][] {
+  const facts: [string, string][] = [];
+  if (p.light?.length) facts.push(['Standplaats', joinNl(p.light, 'of')]);
+  if (p.soil?.length) facts.push(['Grond', joinNl(p.soil, 'of')]);
+  if (p.height) facts.push(['Hoogte', `${p.height.replace('-', '–')} cm`]);
+  if (p.bloom?.length) facts.push(['Bloei', monthRanges(p.bloom)]);
+  facts.push(['Snoeien', p.months.length ? monthRanges(p.months) : 'Geen snoei nodig']);
+  return facts;
+}
+
+/** Tip als tekst; tips die met "Let op:" beginnen krijgen een waarschuwingsstijl. */
+function TipText({ tip }: { tip: string }) {
+  if (!tip) return null;
+  if (tip.startsWith('Let op:')) {
+    return (
+      <p className="tiptext warn">
+        <svg viewBox="0 0 16 16" aria-hidden="true" className="ico"><path d="M8 2 14.5 13.5h-13L8 2Z" /><path d="M8 6.5v3M8 11.6v.1" /></svg>
+        <span><b>Let op:</b>{tip.slice('Let op:'.length)}</span>
+      </p>
+    );
+  }
+  return <p className="tiptext">{tip}</p>;
+}
+
+function InheemsTag() {
+  return <span className="tag">inheems</span>;
 }
 
 /** Alleen zichtbaar bij afdrukken: een poster om in de schuur of garage op te hangen. */
@@ -647,14 +700,16 @@ function PrintPoster({ plants }: { plants: Plant[] }) {
     <div className="poster" aria-hidden="true">
       <div className="poster-head">
         <h2>Snoeikalender</h2>
-        <p>Een vakje betekent: deze maand snoeien.</p>
+        <p>Een vakje betekent: deze maand snoeien. De lichte balk is de bloeitijd.</p>
       </div>
       <YearGrid plants={plants} />
       <ol className="poster-tips">
         {plants.map((p) => (
           <li key={p.id}>
-            <b>{p.name}</b> <span className="when">snoeien in {joinNl(p.months.map((m) => MONTHS_LONG[m - 1]))}</span>
-            <p>{p.tip}</p>
+            <b>{p.name}</b>{' '}
+            <span className="when">{p.months.length ? `snoeien in ${monthRanges(p.months)}` : 'geen snoei nodig'}</span>
+            <p className="pfacts">{plantFacts(p).filter(([k]) => k !== 'Snoeien').map(([k, v]) => `${k}: ${v}.`).join(' ')}</p>
+            <TipText tip={p.tip} />
           </li>
         ))}
       </ol>
@@ -669,38 +724,200 @@ function PlantTip({ p }: { p: Plant }) {
       <span className="stripe ok" aria-hidden="true" />
       <div>
         <b>{p.name}</b>
-        <p>{p.tip}</p>
+        <TipText tip={p.tip} />
       </div>
+    </li>
+  );
+}
+
+/** Een gekozen plant met alle bekende eigenschappen en de tip. */
+function PlantCard({ p }: { p: Plant }) {
+  return (
+    <li className="pcard">
+      <div className="pc-head">
+        <b>{p.name}</b>
+        {p.inheems && <InheemsTag />}
+      </div>
+      {p.latin && <i className="latin">{p.latin}</i>}
+      <dl className="facts">
+        {plantFacts(p).map(([k, v]) => (
+          <div key={k}>
+            <dt>{k}</dt>
+            <dd>{v}</dd>
+          </div>
+        ))}
+      </dl>
+      <TipText tip={p.tip} />
     </li>
   );
 }
 
 function PlantPicker({ mine, setMine }: { mine: string[]; setMine: (ids: string[]) => void }) {
   const [q, setQ] = useState('');
-  const groups = [...new Set(PLANTS.map((p) => p.group))];
-  const match = (p: Plant) => p.name.toLowerCase().includes(q.toLowerCase());
+  const [light, setLight] = useState<Licht | null>(null);
+  const [soil, setSoil] = useState<Grond | null>(null);
+  const [onlyNative, setOnlyNative] = useState(false);
+  const [openGroups, setOpenGroups] = useState<string[]>([]);
+
+  const needle = q.trim().toLowerCase();
+  const filtering = light !== null || soil !== null || onlyNative;
+  const active = needle !== '' || filtering;
+  // Zoeken op Nederlandse én Latijnse naam. Zonder standplaats- of grondgegevens val je weg bij die filters.
+  const pass = (p: Plant) =>
+    (needle === '' || p.name.toLowerCase().includes(needle) || !!p.latin?.toLowerCase().includes(needle)) &&
+    (light === null || !!p.light?.includes(light)) &&
+    (soil === null || !!p.soil?.includes(soil)) &&
+    (!onlyNative || !!p.inheems);
+  const results = PLANTS.filter(pass);
   const toggle = (id: string) => setMine(mine.includes(id) ? mine.filter((x) => x !== id) : [...mine, id]);
+  const toggleGroup = (g: string) => setOpenGroups((o) => (o.includes(g) ? o.filter((x) => x !== g) : [...o, g]));
+  const clear = () => { setLight(null); setSoil(null); setOnlyNative(false); };
+  const n = results.length;
 
   return (
     <div className="picker">
-      <input aria-label="Zoek een plant" placeholder="Zoek een plant…" value={q} onChange={(e) => setQ(e.target.value)} />
-      {groups.map((g) => {
-        const list = PLANTS.filter((p) => p.group === g && match(p));
+      <input aria-label="Zoek een plant op Nederlandse of Latijnse naam" placeholder="Zoek op Nederlandse of Latijnse naam…" value={q} onChange={(e) => setQ(e.target.value)} />
+
+      <div className="filters">
+        <div className="fgroup" role="group" aria-label="Standplaats">
+          <span className="flabel">Standplaats</span>
+          <div className="seg">
+            {LIGHTS.map((v) => <button key={v} aria-pressed={light === v} onClick={() => setLight(light === v ? null : v)}>{cap(v)}</button>)}
+          </div>
+        </div>
+        <div className="fgroup" role="group" aria-label="Grond">
+          <span className="flabel">Grond</span>
+          <div className="seg">
+            {SOILS.map((v) => <button key={v} aria-pressed={soil === v} onClick={() => setSoil(soil === v ? null : v)}>{cap(v)}</button>)}
+          </div>
+        </div>
+        <label className="fcheck">
+          <input type="checkbox" checked={onlyNative} onChange={(e) => setOnlyNative(e.target.checked)} />
+          Alleen inheemse planten
+        </label>
+      </div>
+
+      <p className="fcount" aria-live="polite">
+        {active ? `${n} ${n === 1 ? 'plant' : 'planten'} gevonden.` : `${PLANTS.length} planten in ${GROUPS.length} groepen.`}
+        {(light || soil) && ' Standplaats en grond zijn alleen bekend voor de vaste planten uit de top 100.'}
+        {filtering && <> <button className="linkbtn" onClick={clear}>Filters wissen</button></>}
+      </p>
+      {n === 0 && needle && <p className="muted nohit">Geen plant gevonden met “{q.trim()}”. Je kunt hem hieronder voorstellen.</p>}
+
+      {GROUPS.map((g) => {
+        const all = PLANTS.filter((p) => p.group === g);
+        const list = active ? results.filter((p) => p.group === g) : all;
         if (list.length === 0) return null;
+        const open = active || openGroups.includes(g);
+        const chosen = all.filter((p) => mine.includes(p.id)).length;
+        const id = `grp-${g.replace(/\W+/g, '-')}`;
         return (
-          <div key={g}>
-            <h4>{g}</h4>
-            <div className="chips">
-              {list.map((p) => (
-                <button key={p.id} className={`pchip ${mine.includes(p.id) ? 'on' : ''}`} aria-pressed={mine.includes(p.id)} onClick={() => toggle(p.id)}>
-                  {mine.includes(p.id) ? '✓ ' : '+ '}{p.name}
-                </button>
-              ))}
-            </div>
+          <div key={g} className="pgroup">
+            <button className="grp-head" aria-expanded={open} aria-controls={id} onClick={() => !active && toggleGroup(g)} disabled={active}>
+              <svg viewBox="0 0 16 16" aria-hidden="true" className="ico chev"><path d="m6 4 4 4-4 4" /></svg>
+              <span className="gname">{g}</span>
+              <span className="gcount">
+                {active ? `${list.length} van ${all.length}` : `${all.length} ${all.length === 1 ? 'plant' : 'planten'}`}
+                {chosen > 0 && `, ${chosen} gekozen`}
+              </span>
+            </button>
+            {open && (
+              <div className="chips" id={id}>
+                {list.map((p) => (
+                  <button key={p.id} className={`pchip ${mine.includes(p.id) ? 'on' : ''}`} aria-pressed={mine.includes(p.id)} onClick={() => toggle(p.id)}>
+                    <span className="pc-name">
+                      {mine.includes(p.id) ? '✓ ' : '+ '}{p.name}
+                      {p.inheems && <InheemsTag />}
+                    </span>
+                    {p.latin && <i className="latin">{p.latin}</i>}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         );
       })}
+      <SuggestPlant initial={n === 0 && needle ? q.trim() : ''} />
     </div>
+  );
+}
+
+/**
+ * Suggestie voor een plant die nog ontbreekt. Gaat via Netlify Forms: het formulier "plant-suggestie"
+ * staat ook verborgen in index.html, zodat Netlify het bij de build herkent.
+ */
+function SuggestPlant({ initial }: { initial: string }) {
+  const [open, setOpen] = useState(false);
+  const [plant, setPlant] = useState('');
+  const [note, setNote] = useState('');
+  const [bot, setBot] = useState('');
+  const [state, setState] = useState<'idle' | 'sending' | 'sent' | 'error'>('idle');
+
+  const start = () => {
+    setPlant(initial);
+    setState('idle');
+    setOpen(true);
+  };
+
+  const submit = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!plant.trim()) return;
+    setState('sending');
+    try {
+      if (DEMO === null) {
+        const body = new URLSearchParams({ 'form-name': 'plant-suggestie', plant: plant.trim(), toelichting: note.trim(), 'bot-field': bot });
+        const res = await fetch('/', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: body.toString() });
+        if (!res.ok) throw new Error(String(res.status));
+      }
+      setState('sent');
+      setPlant('');
+      setNote('');
+    } catch {
+      setState('error');
+    }
+  };
+
+  if (!open) {
+    return (
+      <div className="suggest">
+        <p>Staat je plant er niet tussen?</p>
+        <button className="chip" onClick={start}>Stel een plant voor</button>
+      </div>
+    );
+  }
+
+  if (state === 'sent') {
+    return (
+      <div className="suggest" role="status">
+        <p><b>Bedankt voor je suggestie!</b> We bekijken of de plant in de snoeikalender past.</p>
+        <button className="chip" onClick={start}>Nog een plant voorstellen</button>
+      </div>
+    );
+  }
+
+  return (
+    <form className="suggest form" name="plant-suggestie" onSubmit={submit}>
+      <h4 className="stitle">Stel een plant voor</h4>
+      <label>
+        <span>Naam van de plant</span>
+        <input required autoFocus value={plant} onChange={(e) => setPlant(e.target.value)} placeholder="Bijvoorbeeld hibiscus" maxLength={80} />
+      </label>
+      <label>
+        <span>Toelichting <span className="muted">(niet verplicht)</span></span>
+        <textarea value={note} onChange={(e) => setNote(e.target.value)} rows={3} maxLength={500}
+          placeholder="Bijvoorbeeld welke soort, of wanneer jij hem snoeit" />
+      </label>
+      {/* honeypot tegen spam: mensen zien dit veld niet */}
+      <label className="hp" aria-hidden="true">
+        Niet invullen <input tabIndex={-1} autoComplete="off" value={bot} onChange={(e) => setBot(e.target.value)} name="bot-field" />
+      </label>
+      <p className="muted small">Je stuurt alleen de plantnaam en je toelichting mee, geen naam of e-mailadres.</p>
+      {state === 'error' && <p className="notice">Versturen lukte niet. Probeer het later nog eens.</p>}
+      <div className="actions">
+        <button className="btn" type="submit" disabled={state === 'sending' || !plant.trim()}>{state === 'sending' ? 'Versturen…' : 'Versturen'}</button>
+        <button className="btn ghost" type="button" onClick={() => setOpen(false)}>Annuleren</button>
+      </div>
+    </form>
   );
 }
 

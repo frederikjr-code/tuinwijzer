@@ -2,13 +2,9 @@
 import { useCallback, useEffect, useState } from 'react';
 import { type Gift, addDays } from './weather';
 
-export type Amount = 'beetje' | 'normaal' | 'flink';
-export const AMOUNT_LABEL: Record<Amount, string> = { beetje: 'Een beetje', normaal: 'Normaal', flink: 'Flink' };
-const FACTOR: Record<Amount, number> = { beetje: 0.5, normaal: 1, flink: 2 };
-
-/** Een normale gift in mm per zone. "Een beetje" is de helft, "flink" het dubbele. */
+/** Een gift in mm per zone. Elke geregistreerde gift telt als een normale gift. */
 export const NORMAL_MM: Record<string, number> = { Gras: 12, Planten: 15, Moestuin: 10, Potten: 10 };
-export const giftMm = (zone: string, amount: Amount) => (NORMAL_MM[zone] ?? 10) * FACTOR[amount];
+export const giftMm = (zone: string) => NORMAL_MM[zone] ?? 10;
 
 const KEEP_DAYS = 14;
 
@@ -45,8 +41,8 @@ export function useGardenLog(today: string, demo: boolean) {
   useEffect(() => write(prefix + 'gifts', gifts.filter((g) => g.date >= oldest)), [gifts, prefix, oldest]);
   useEffect(() => write(prefix + 'answers', answers.filter((d) => d >= oldest)), [answers, prefix, oldest]);
 
-  const addGifts = useCallback((list: { zone: string; date: string; amount: Amount }[]) => {
-    const made = list.map(({ zone, date, amount }) => ({ id: newId(), zone, date, mm: giftMm(zone, amount) }));
+  const addGifts = useCallback((list: { zone: string; date: string }[]) => {
+    const made = list.map(({ zone, date }) => ({ id: newId(), zone, date, mm: giftMm(zone) }));
     setGifts((g) => [...g, ...made]);
     return made.map((g) => g.id);
   }, []);

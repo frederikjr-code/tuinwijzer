@@ -13,6 +13,7 @@
   --frost: #bfd9e8;
   --evap: #c8902e;
   --gift: #8db33a; /* jouw eigen water */
+  --bloom: #e2b6d6; /* bloeitijd in de snoeikalender */
 
   /* sterkere varianten: streepjes (≥ 3:1) en tekst (≥ 4,5:1) op --bg */
   --good-strong: #67951c;
@@ -46,7 +47,7 @@
 
 * { box-sizing: border-box; }
 body { margin: 0; background: var(--bg); }
-button, input { font: inherit; color: inherit; }
+button, input, textarea { font: inherit; color: inherit; }
 a { color: var(--ink); text-underline-offset: 3px; text-decoration-thickness: 1px; }
 a:hover { text-decoration-thickness: 2px; }
 
