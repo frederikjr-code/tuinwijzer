@@ -59,14 +59,18 @@ export function waterAdvice(days: Day[]): { balance: number; rain48: number; adv
   const lowEvap = past.reduce((s, d) => s + d.et0, 0) < 5; // winterrust: nauwelijks verdamping
 
   const zones = [
-    { zone: 'Gazon', icon: '🌿', limit: -15, amount: '10–15 mm per keer (± 10–15 liter per m²), liever 1× flink dan elke dag een beetje', b: balance },
-    { zone: 'Border & struiken', icon: '🌸', limit: -20, amount: 'een flinke gieter per plant aan de voet, \'s ochtends of \'s avonds', b: balance },
-    { zone: 'Moestuin', icon: '🥕', limit: -12, amount: '± 10 liter per m², bij de wortels en niet over het blad', b: balance },
-    { zone: 'Potten & bakken', icon: '🪴', limit: -6, amount: 'tot er water uit het gat onderin loopt, voel eerst of de grond droog is', b: last3 },
+    { zone: 'Gazon', icon: '🌿', limit: -15, amount: '10–15 mm per keer (± 10–15 liter per m²), liever 1× flink dan elke dag een beetje', b: balance,
+      frostTip: 'Loop niet over het bevroren gras, dat beschadigt de sprieten.' },
+    { zone: 'Border & struiken', icon: '🌸', limit: -20, amount: 'een flinke gieter per plant aan de voet, \'s ochtends of \'s avonds', b: balance,
+      frostTip: 'Dek gevoelige planten af met vliesdoek of een laag blad rond de voet.' },
+    { zone: 'Moestuin', icon: '🥕', limit: -12, amount: '± 10 liter per m², bij de wortels en niet over het blad', b: balance,
+      frostTip: 'Bescherm wintergroenten met vliesdoek en oogst wat niet tegen vorst kan.' },
+    { zone: 'Potten & bakken', icon: '🪴', limit: -6, amount: 'tot er water uit het gat onderin loopt, voel eerst of de grond droog is', b: last3,
+      frostTip: 'Potten liever droog en beschut zetten.' },
   ];
 
-  const advice = zones.map(({ zone, icon, limit, amount, b }): Advice => {
-    if (frost) return { zone, icon, status: 'frost', text: 'Vorst verwacht: geen water geven. Potten liever droog en beschut zetten.' };
+  const advice = zones.map(({ zone, icon, limit, amount, b, frostTip }): Advice => {
+    if (frost) return { zone, icon, status: 'frost', text: `Vorst verwacht: geen water geven. ${frostTip}` };
     if (lowEvap && b > limit) return { zone, icon, status: 'ok', text: 'De tuin is in rust en verdampt nauwelijks. Geen water nodig.' };
     if (rain48 >= 5 && b > limit * 2) return { zone, icon, status: 'ok', text: `Er komt ${rain48.toFixed(0)} mm regen aan. Wacht dat even af.` };
     if (b <= limit) return { zone, icon, status: 'water', text: `Water geven: ${amount}.` };

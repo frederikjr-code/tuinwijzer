@@ -69,7 +69,7 @@ function Water({ place, setPlace }: { place: Place; setPlace: (p: Place) => void
     : worst?.status === 'water'
       ? 'Vandaag water geven'
       : worst?.status === 'frost'
-        ? 'Niet water geven: vorst op komst'
+        ? 'Geen water geven: vorst op komst'
         : worst?.status === 'soon'
           ? 'Nog niet, maar het wordt droger'
           : 'Geen water nodig';
@@ -147,9 +147,18 @@ function PlacePicker({ place, setPlace }: { place: Place; setPlace: (p: Place) =
   );
 }
 
+// Kleinste "ronde" stap (1, 2, 5, 10, 20, 50, …) die minstens x is.
+function niceStep(x: number) {
+  const pow = 10 ** Math.floor(Math.log10(x));
+  return [1, 2, 5, 10].map((m) => m * pow).find((s) => s >= x)!;
+}
+
 function RainChart({ days }: { days: Day[] }) {
   const W = 700, H = 170, padL = 30, padB = 34, padT = 10;
-  const max = Math.max(4, ...days.map((d) => Math.max(d.rain, d.et0))) * 1.1;
+  const dataMax = Math.max(4, ...days.map((d) => Math.max(d.rain, d.et0)));
+  const step = niceStep(dataMax / 3);
+  const max = Math.ceil((dataMax * 1.05) / step) * step;
+  const ticks = Array.from({ length: Math.round(max / step) + 1 }, (_, i) => i * step);
   const bw = (W - padL) / days.length;
   const y = (v: number) => padT + (H - padT - padB) * (1 - v / max);
   const todayIdx = days.findIndex((d) => !d.past);
@@ -160,7 +169,7 @@ function RainChart({ days }: { days: Day[] }) {
       <div className="legend"><span className="lg rain" /> Regen (mm) <span className="lg evap" /> Verdamping (mm)</div>
       <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label="Regen en verdamping per dag">
         {todayIdx > 0 && <rect x={padL + todayIdx * bw} y={padT} width={W - padL - todayIdx * bw} height={H - padT - padB} className="future" />}
-        {[0, max / 2].map((t) => (
+        {ticks.map((t) => (
           <g key={t}>
             <line x1={padL} x2={W} y1={y(t)} y2={y(t)} className="grid" />
             <text x={padL - 5} y={y(t) + 4} className="axis" textAnchor="end">{t.toFixed(0)}</text>
