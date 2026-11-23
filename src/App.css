@@ -25,9 +25,8 @@
 .teaser > .ico { width: 28px; height: 28px; flex: none; fill: var(--rain); stroke: none; }
 .teaser .chip { text-decoration: none; }
 .logo { width: 34px; height: 34px; flex: none; }
-.logo-tube { fill: none; stroke: var(--ink); stroke-width: 2; }
-.logo-water { fill: var(--rain); }
-.logo-tick { stroke: var(--ink); stroke-width: 1.6; stroke-linecap: round; }
+.logo-leaf { fill: var(--good); }
+.logo-vein, .logo-stem { fill: none; stroke: var(--ink); stroke-width: 1.8; stroke-linecap: round; }
 .top h1 { margin: 0; font-size: 24px; font-weight: 700; letter-spacing: -0.03em; line-height: 1.1; }
 .top p { margin: 2px 0 0; color: var(--muted); font-size: 15px; }
 
@@ -71,10 +70,10 @@ p { margin: 0; }
   box-shadow: 0 16px 40px rgb(20 48 42 / 0.16); /* het enige zwevende element */
   display: flex; flex-direction: column; gap: 2px;
 }
-.popover input, .picker > input {
+.popover input {
   width: 100%; padding: 10px 12px; border: 1px solid var(--line-strong); border-radius: 10px; background: var(--surface);
 }
-.popover input:focus-visible, .picker > input:focus-visible { outline-offset: 0; border-color: var(--rain); }
+.popover input:focus-visible, .search input:focus-visible { outline-offset: 0; border-color: var(--rain); }
 .hit { text-align: left; background: none; border: 0; padding: 9px 10px; border-radius: 8px; cursor: pointer; }
 .hit:hover { background: var(--bg); }
 .locate { color: var(--rain); font-weight: 600; border-top: 1px solid var(--line); border-radius: 0 0 8px 8px; margin-top: 4px; }
@@ -267,12 +266,15 @@ p { margin: 0; }
 .pchip.on .tag { color: #fff; background: rgb(255 255 255 / 0.2); }
 
 /* filters en ingeklapte groepen in de plantenkiezer */
-.filters { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 24px; margin-top: 14px; }
+.filters {
+  display: grid; justify-items: start; gap: 14px; margin-top: 4px;
+  background: rgb(255 255 255 / 0.55); border-radius: var(--r-md); padding: 16px 18px;
+}
+.fnote { margin: 0; }
 .fgroup { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 10px; }
 .flabel { font-size: 14px; color: var(--muted); }
 .fcheck { display: inline-flex; align-items: center; gap: 8px; font-size: 15px; cursor: pointer; }
 .fcheck input { width: 18px; height: 18px; margin: 0; accent-color: var(--ink); }
-.fcount { margin: 14px 0 6px; font-size: 14px; color: var(--muted); }
 .linkbtn { background: none; border: 0; padding: 0; color: var(--ink); text-decoration: underline; text-underline-offset: 3px; cursor: pointer; font: inherit; }
 .pgroup { border-top: 1px solid var(--line); }
 .pgroup:last-of-type { border-bottom: 1px solid var(--line); }
@@ -363,4 +365,74 @@ footer { color: var(--muted); font-size: 14px; line-height: 1.6; margin-top: 80p
   .zhead { flex-direction: row; align-items: baseline; gap: 10px; }
   .popover { right: auto; left: 0; }
   h3 { margin-top: 32px; }
+}
+
+/* ---------- snoeikalender: blokken met ruimte ---------- */
+.prune .block + .block { margin-top: 72px; }
+.prune .block > h2, .prune .block > .sechead { margin-bottom: 18px; }
+.hsub { font-weight: 400; color: var(--muted); }
+.prune .lead { color: var(--muted); font-size: 16px; margin-bottom: 18px; }
+.tbody { flex: 1; min-width: 0; }
+.thead { display: flex; align-items: center; justify-content: space-between; gap: 8px 12px; flex-wrap: wrap; }
+.chip.small { min-height: 32px; padding: 4px 12px; font-size: 14px; }
+.chip.on { background: var(--ink); border-color: var(--ink); color: #fff; }
+
+/* maandbalk: snoeimaanden gekleurd, huidige maand omlijnd */
+.mbar { display: grid; grid-template-columns: repeat(12, 1fr); gap: 3px; max-width: 320px; margin-top: 10px; }
+.mbar span {
+  height: 22px; display: grid; place-items: center; border-radius: 4px;
+  font-size: 10.5px; font-weight: 600; color: var(--muted); background: rgb(20 48 42 / 0.06);
+}
+.mbar span.on { background: var(--good-strong); color: #fff; }
+.mbar span.cur { box-shadow: inset 0 0 0 2px var(--ink); color: var(--ink); }
+.mbar span.on.cur { color: #fff; }
+.pcard .mbar { margin: 10px 0 2px; }
+
+/* gekozen planten */
+.mychips { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px; }
+.mychips li {
+  display: inline-flex; align-items: center; gap: 2px; font-size: 15px;
+  background: var(--surface); border: 1px solid var(--line-strong); border-radius: 999px; padding: 3px 3px 3px 14px;
+}
+.mychips button {
+  width: 32px; height: 32px; display: grid; place-items: center; border: 0; border-radius: 999px; background: none; cursor: pointer; color: var(--muted);
+}
+.mychips button:hover { background: var(--bg); color: var(--ink); }
+
+/* zoekveld met wisknop */
+.search { position: relative; }
+.search > .ico { position: absolute; left: 16px; top: 50%; transform: translateY(-50%); width: 18px; height: 18px; color: var(--muted); pointer-events: none; }
+.search input {
+  width: 100%; min-height: 50px; padding: 10px 52px 10px 44px; font-size: 16px;
+  border: 1px solid var(--line-strong); border-radius: 999px; background: var(--surface);
+}
+.search-x {
+  position: absolute; right: 7px; top: 50%; transform: translateY(-50%);
+  width: 36px; height: 36px; display: grid; place-items: center; border: 0; border-radius: 999px; background: none; cursor: pointer; color: var(--muted);
+}
+.search-x:hover { background: var(--bg); color: var(--ink); }
+
+.ftoggle {
+  display: inline-flex; align-items: center; gap: 6px; margin-top: 10px; padding: 8px 2px;
+  background: none; border: 0; cursor: pointer; font-size: 15px; color: var(--muted);
+}
+.ftoggle:hover { color: var(--ink); }
+.ftoggle .chev { transition: transform .15s; }
+.ftoggle[aria-expanded='true'] .chev { transform: rotate(180deg); }
+.fbadge { min-width: 20px; height: 20px; padding: 0 6px; border-radius: 999px; background: var(--ink); color: #fff; font-size: 12px; font-weight: 700; display: inline-grid; place-items: center; }
+
+.popular { margin-top: 24px; }
+.popular .mlabel { margin: 0 0 10px; font-size: 14px; font-weight: 500; letter-spacing: 0; }
+.pgroups { margin-top: 32px; }
+
+/* groepsiconen */
+.gico { width: 22px; height: 22px; flex: none; fill: none; stroke: var(--good-text); stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+.pc-head .gico { width: 18px; height: 18px; align-self: center; }
+.grp-head { gap: 12px; padding: 14px 0; }
+.gcount { display: inline-flex; gap: 10px; }
+.gchosen { color: var(--good-text); font-weight: 600; }
+
+@media (max-width: 640px) {
+  .prune .block + .block { margin-top: 56px; }
+  .mbar { max-width: none; }
 }

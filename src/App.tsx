@@ -1,6 +1,9 @@
-import { type FormEvent, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { type FormEvent, type ReactNode, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import './App.css';
-import { GROUPS, type Grond, type Licht, MONTHS, MONTHS_LONG, PLANTS, type Plant, buildIcs, monthRanges } from './plants';
+import { GRONDSOORTEN } from './grondsoorten';
+import {
+  GROUPS, type Grond, type Grondsoort, type Licht, MONTHS, MONTHS_LONG, MONTH_LETTERS, PLANTS, POPULAR, type Plant, buildIcs, monthRanges,
+} from './plants';
 import {
   type Advice, type Day, DEFAULT_PLACE, GIETER_LITER, type Gift, type Place, SLANG_LITER_PER_MIN, type Status, type WaterUnit,
   addDays, dayPhrase, fetchWeather, isoToday, searchPlace, waterAdvice,
@@ -38,6 +41,49 @@ const NAV: { page: Exclude<Page, 'home'>; href: string; label: string }[] = [
   { page: 'water', href: '/water', label: 'Water' },
 ];
 
+const SUBTITLE: Record<Page, string> = {
+  home: 'Snoeien en water geven, op het juiste moment.',
+  snoeikalender: 'Wanneer snoei je welke plant?',
+  water: 'Moet ik vandaag water geven?',
+};
+
+/** Blaadje met een schuine snoeisnede aan de steel. */
+function Logo() {
+  return (
+    <svg className="logo" viewBox="0 0 32 32" aria-hidden="true">
+      <path d="M8 24C7 13 14 5 27 5c0 13-8 20-19 19Z" className="logo-leaf" />
+      <path d="M8 24 19 13" className="logo-vein" />
+      <path d="M8 24 4.5 27.5M3 26l3 3" className="logo-stem" />
+    </svg>
+  );
+}
+
+type Toast = { text: string; undo: () => void };
+
+/** Melding met "ongedaan maken" die na 8 seconden vanzelf verdwijnt. */
+function useToast() {
+  const [toast, setToast] = useState<Toast | null>(null);
+  useEffect(() => {
+    if (!toast) return;
+    const t = setTimeout(() => setToast(null), 8000);
+    return () => clearTimeout(t);
+  }, [toast]);
+  return [toast, setToast] as const;
+}
+
+function ToastSlot({ toast, close }: { toast: Toast | null; close: () => void }) {
+  return (
+    <div className="toast-slot" role="status" aria-live="polite">
+      {toast && (
+        <div className="toast">
+          <span>{toast.text}, </span>
+          <button onClick={() => { toast.undo(); close(); }}>ongedaan maken</button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function App({ page }: { page: Page }) {
   const [place, setPlace] = useState<Place>(() => load('place', DEFAULT_PLACE));
   const [mine, setMine] = useState<string[]>(() => load('plants', [] as string[]));
@@ -49,14 +95,10 @@ export default function App({ page }: { page: Page }) {
     <main className="wrap">
       <header className="top">
         <a className="brand" href="/" aria-label="Tuinwijzer, naar de homepage">
-          <svg className="logo" viewBox="0 0 32 32" aria-hidden="true">
-            <rect x="10" y="2" width="12" height="28" rx="6" className="logo-tube" />
-            <rect x="10" y="15" width="12" height="15" rx="6" className="logo-water" />
-            <path d="M13 8h3M13 12h3M13 16h3" className="logo-tick" />
-          </svg>
+          <Logo />
           <div>
             <h1>Tuinwijzer</h1>
-            <p>Snoeien en water geven, op het juiste moment.</p>
+            <p>{SUBTITLE[page]}</p>
           </div>
         </a>
         <nav className="nav" aria-label="Hoofdmenu">
@@ -71,17 +113,23 @@ export default function App({ page }: { page: Page }) {
       {page === 'home' && <WaterTeaser place={place} />}
 
       <footer>
-        <p>
-          Weerdata via <a href="https://open-meteo.com" target="_blank" rel="noreferrer">Open-Meteo</a>. Snoeiadvies is een
-          algemene richtlijn, per soort en ras kan het afwijken. Je keuzes worden alleen in je eigen browser bewaard.
-        </p>
-        <p>
-          Vaste planten: top 100 van Ron den Dikken, Levende Tuin Academie (
-          <a href="https://www.tuincursus.com" target="_blank" rel="noreferrer">tuincursus.com</a>). Inheemse planten:{' '}
-          <a href="https://www.tuinplantenloods.nl/blogs/nieuws/%F0%9F%8C%BF-top-100-inheemse-planten-van-nederland" target="_blank" rel="noreferrer">
-            Tuinplantenloods.nl
-          </a>.
-        </p>
+        {page === 'water' ? (
+          <p>
+            Weerdata via <a href="https://open-meteo.com" target="_blank" rel="noreferrer">Open-Meteo</a>. Je woonplaats en giften
+            worden alleen in je eigen browser bewaard.
+          </p>
+        ) : (
+          <>
+            <p>Snoeiadvies en grondsoort zijn een algemene richtlijn; per soort en ras kan het afwijken. Je keuzes blijven in je eigen browser.</p>
+            <p>
+              Vaste planten: top 100 van Ron den Dikken, Levende Tuin Academie (
+              <a href="https://www.tuincursus.com" target="_blank" rel="noreferrer">tuincursus.com</a>). Inheemse planten:{' '}
+              <a href="https://www.tuinplantenloods.nl/blogs/nieuws/%F0%9F%8C%BF-top-100-inheemse-planten-van-nederland" target="_blank" rel="noreferrer">
+                Tuinplantenloods.nl
+              </a>.
+            </p>
+          </>
+        )}
         <p>Gebouwd door Frederik Vermeulen en gevibecodet met Claude.</p>
       </footer>
     </main>
@@ -142,27 +190,19 @@ function assumption(pastDates: string[], known: (d: string) => boolean): string 
 const STATUS_WORD: Record<Status, string> = { frost: 'Vorst', ok: 'Goed', water: 'Water geven', soon: 'Bijna droog' };
 const DAY_LABELS = ['Vandaag', 'Gisteren', 'Eergisteren'];
 
-type Toast = { text: string; undo: () => void };
-
 function Water({ place, setPlace }: { place: Place; setPlace: (p: Place) => void }) {
   const [days, setDays] = useState<Day[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [today] = useState(isoToday);
   const yesterday = addDays(today, -1);
   const log = useGardenLog(today, DEMO !== null);
-  const [toast, setToast] = useState<Toast | null>(null);
+  const [toast, setToast] = useToast();
 
   useEffect(() => {
     setDays(null);
     setError(null);
     (DEMO !== null ? Promise.resolve(demoWeather(DEMO)) : fetchWeather(place)).then(setDays).catch((e: Error) => setError(e.message));
   }, [place]);
-
-  useEffect(() => {
-    if (!toast) return;
-    const t = setTimeout(() => setToast(null), 8000);
-    return () => clearTimeout(t);
-  }, [toast]);
 
   const [unit, setUnit] = useState<WaterUnit>(() => load('unit', 'gieter' as WaterUnit));
   useEffect(() => save('unit', unit), [unit]);
@@ -266,14 +306,7 @@ function Water({ place, setPlace }: { place: Place; setPlace: (p: Place) => void
         </>
       )}
 
-      <div className="toast-slot" role="status" aria-live="polite">
-        {toast && (
-          <div className="toast">
-            <span>{toast.text}, </span>
-            <button onClick={() => { toast.undo(); setToast(null); }}>ongedaan maken</button>
-          </div>
-        )}
-      </div>
+      <ToastSlot toast={toast} close={() => setToast(null)} />
     </section>
   );
 }
@@ -569,15 +602,28 @@ const SEASON = ['w', 'w', 'l', 'l', 'l', 'z', 'z', 'z', 'h', 'h', 'h', 'w'];
 const LIGHTS: Licht[] = ['zon', 'halfschaduw', 'schaduw'];
 const SOILS: Grond[] = ['droog', 'vochtig', 'nat'];
 const cap = (s: string) => s[0].toUpperCase() + s.slice(1);
+const byId = new Map(PLANTS.map((p) => [p.id, p]));
+const plantCount = (n: number) => `${n} ${n === 1 ? 'plant' : 'planten'}`;
 
 function Pruning({ mine, setMine }: { mine: string[]; setMine: (ids: string[]) => void }) {
-  const [picking, setPicking] = useState(mine.length === 0);
+  const [toast, setToast] = useToast();
   const month = new Date().getMonth() + 1;
   const next = (month % 12) + 1;
-  const plants = PLANTS.filter((p) => mine.includes(p.id));
+  // In de volgorde waarin je ze koos, zodat een nieuwe plant achteraan verschijnt.
+  const plants = mine.map((id) => byId.get(id)).filter((p): p is Plant => !!p);
   const pruned = plants.filter((p) => p.months.length > 0); // planten zonder snoei komen niet in de agenda
   const nowList = plants.filter((p) => p.months.includes(month));
   const nextList = plants.filter((p) => p.months.includes(next) && !p.months.includes(month));
+  // Nog niets gekozen: laat zien wat je nu in het algemeen snoeit, populaire planten eerst.
+  const rank = (p: Plant) => (POPULAR.includes(p.id) ? POPULAR.indexOf(p.id) : POPULAR.length);
+  const suggestions = PLANTS.filter((p) => p.months.includes(month)).sort((a, b) => rank(a) - rank(b)).slice(0, 8);
+
+  const toggle = (id: string) => setMine(mine.includes(id) ? mine.filter((x) => x !== id) : [...mine, id]);
+  const clearAll = () => {
+    const before = mine;
+    setMine([]);
+    setToast({ text: `${plantCount(before.length)} gewist`, undo: () => setMine(before) });
+  };
 
   const download = () => {
     const blob = new Blob([buildIcs(pruned)], { type: 'text/calendar;charset=utf-8' });
@@ -589,61 +635,109 @@ function Pruning({ mine, setMine }: { mine: string[]; setMine: (ids: string[]) =
   };
 
   return (
-    <section className="section prune" aria-labelledby="prune-h">
-      <div className="sechead">
-        <h2 id="prune-h">Maak je eigen snoeikalender</h2>
-        {picking ? (
-          <button className="chip primary" disabled={plants.length === 0} onClick={() => setPicking(false)}>Toon mijn kalender ({plants.length})</button>
-        ) : (
-          <button className="chip" onClick={() => setPicking(true)}>Planten aanpassen</button>
-        )}
-      </div>
-
-      {picking && (
-        <>
-          <p className="lead">Kies de planten die in je tuin staan.</p>
-          <PlantPicker mine={mine} setMine={setMine} />
-        </>
-      )}
-
-      {!picking && plants.length === 0 && <p className="muted">Kies eerst welke planten je in je tuin hebt.</p>}
-
-      {!picking && plants.length > 0 && (
-        <>
-          <h3>Deze maand ({MONTHS_LONG[month - 1]})</h3>
-          {nowList.length === 0 ? (
-            <p className="muted">Niets te snoeien. Even genieten van de tuin.</p>
-          ) : (
-            <ul className="tips">{nowList.map((p) => <PlantTip key={p.id} p={p} />)}</ul>
-          )}
-          {nextList.length > 0 && (
+    <div className="section prune">
+      <section className="block" aria-labelledby="now-h">
+        <h2 id="now-h">Nu snoeien <span className="hsub">in {MONTHS_LONG[month - 1]}</span></h2>
+        {plants.length === 0 ? (
+          suggestions.length > 0 ? (
             <>
-              <h3>Volgende maand ({MONTHS_LONG[next - 1]})</h3>
-              <ul className="tips later">{nextList.map((p) => <PlantTip key={p.id} p={p} />)}</ul>
+              <p className="lead">Dit kun je nu snoeien. Voeg je planten toe voor een eigen kalender.</p>
+              <ul className="tips">
+                {suggestions.map((p) => <PlantTip key={p.id} p={p} month={month} added={mine.includes(p.id)} onAdd={() => toggle(p.id)} />)}
+              </ul>
             </>
-          )}
+          ) : (
+            <p className="muted">Deze maand hoef je niets te snoeien.</p>
+          )
+        ) : nowList.length === 0 ? (
+          <p className="muted">Niets te snoeien. Even genieten van de tuin.</p>
+        ) : (
+          <ul className="tips">{nowList.map((p) => <PlantTip key={p.id} p={p} month={month} />)}</ul>
+        )}
+        {nextList.length > 0 && (
+          <>
+            <h3>Volgende maand</h3>
+            <ul className="tips later">{nextList.map((p) => <PlantTip key={p.id} p={p} month={month} />)}</ul>
+          </>
+        )}
+      </section>
 
-          <h3>Het hele jaar</h3>
+      <section className="block" aria-labelledby="mine-h">
+        <div className="sechead">
+          <h2 id="mine-h">Mijn planten</h2>
+          {plants.length > 0 && <button className="linkbtn" onClick={clearAll}>Alles wissen</button>}
+        </div>
+        {plants.length > 0 ? (
+          <ul className="mychips">
+            {plants.map((p) => (
+              <li key={p.id}>
+                <span>{p.name}</span>
+                <button aria-label={`${p.name} verwijderen`} title="Verwijderen" onClick={() => toggle(p.id)}>
+                  <svg viewBox="0 0 16 16" aria-hidden="true" className="ico"><path d="m4.5 4.5 7 7m0-7-7 7" /></svg>
+                </button>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="muted">Nog geen planten gekozen.</p>
+        )}
+      </section>
+
+      <section className="block" aria-labelledby="add-h">
+        <h2 id="add-h">Plant toevoegen</h2>
+        <PlantPicker mine={mine} toggle={toggle} />
+      </section>
+
+      {plants.length > 0 && (
+        <section className="block" aria-labelledby="year-h">
+          <h2 id="year-h">Mijn snoeikalender</h2>
           <YearGrid plants={plants} month={month} />
 
-          <h3>Mijn planten</h3>
-          <ul className="pcards">{plants.map((p) => <PlantCard key={p.id} p={p} />)}</ul>
+          <h3>Per plant</h3>
+          <ul className="pcards">{plants.map((p) => <PlantCard key={p.id} p={p} month={month} />)}</ul>
 
           <div className="actions">
             <button className="btn" onClick={() => window.print()}>Printen voor in de schuur</button>
             <button className="btn ghost" onClick={download} disabled={pruned.length === 0}>Zet in mijn agenda (.ics)</button>
           </div>
           <p className="muted small">
-            De print is een A4 liggend, met per plant wanneer en hoe je snoeit; bij veel planten lopen de tips door op een tweede blad. De agenda werkt met Google Agenda, Outlook
-            en Apple Agenda, en de herinneringen herhalen elk jaar op de 1e van de snoeimaand.
-            {pruned.length < plants.length && ' Planten die geen snoei nodig hebben, komen niet in de agenda.'}
+            Printen geeft een A4 liggend. De agenda werkt met Google, Outlook en Apple en herinnert je elk jaar op de 1e van de snoeimaand.
           </p>
-        </>
+        </section>
       )}
 
       {plants.length > 0 && <PrintPoster plants={plants} />}
-    </section>
+      <ToastSlot toast={toast} close={() => setToast(null)} />
+    </div>
   );
+}
+
+/** Twaalf blokjes J–D: snoeimaanden gekleurd, de huidige maand omlijnd. */
+function MonthBar({ months, month }: { months: number[]; month: number }) {
+  return (
+    <div className="mbar" role="img" aria-label={months.length ? `Snoeien in ${monthRanges(months)}` : 'Geen snoei nodig'}>
+      {MONTH_LETTERS.map((l, i) => (
+        <span key={i} className={`${months.includes(i + 1) ? 'on' : ''}${i + 1 === month ? ' cur' : ''}`}>{l}</span>
+      ))}
+    </div>
+  );
+}
+
+/** Eenvoudig lijnicoon per plantgroep. */
+const GROUP_ICON: Record<Plant['group'], ReactNode> = {
+  Heesters: <><path d="M6.5 16.5a4 4 0 0 1-.8-7.6 5 5 0 0 1 9.3-2 4 4 0 0 1 3.5 7.1 3 3 0 0 1-2.5 2.5Z" /><path d="M12 16.5V21M8.5 21h7" /></>,
+  Hagen: <><rect x="3" y="6" width="18" height="11" rx="3.5" /><path d="M7 17v4M17 17v4M3 21h18" /></>,
+  Bomen: <><circle cx="12" cy="9" r="6" /><path d="M12 15v6M9 21h6M12 17l-2.5-2.5" /></>,
+  Fruit: <><path d="M12 8.5c-1.8-1.3-7-1.6-7 4 0 4 3 7.5 5 7.5 1 0 1.4-.5 2-.5s1 .5 2 .5c2 0 5-3.5 5-7.5 0-5.6-5.2-5.3-7-4Z" /><path d="M12 8.5c0-2 .8-3.6 2.5-5M12.5 6c1.5-1.8 3.5-2 5-1.5-.6 1.7-2.6 2.5-5 1.5Z" /></>,
+  Klimplanten: <><path d="M12 21c-3.5-2.5 3.5-4.5 0-7s3.5-4.5 0-7S12 3 12 3" /><path d="M12.5 14c1.2-1.8 3.3-2.3 5-1.8-.8 1.8-2.8 2.6-5 1.8ZM11.5 7.5c-1.2-1.8-3.3-2.3-5-1.8.8 1.8 2.8 2.6 5 1.8Z" /></>,
+  'Vaste planten & kruiden': <><path d="M8 4.5l2 2.2 2-3.2 2 3.2 2-2.2V9a4 4 0 0 1-8 0Z" /><path d="M12 13v8M12 18.5c-1.8 0-4-1-5-3.5 2 0 4 1 5 3.5ZM12 17c1.8 0 4-1 5-3.5-2 0-4 1-5 3.5Z" /></>,
+  Varens: <><path d="M6 21C8 13 12 7.5 19 3.5" /><path d="M8.3 15.5 5 14.5M9.8 12.5l-3-2M11.7 9.8l-2-3M14 7.5l-1.2-3M10 16.5l2.8 1.8M11.7 13.5l3.3.8M13.7 10.5l3.3-.2M16 8l3-1" /></>,
+  'Grassen & zeggen': <><path d="M12 21V5M12 21c-.6-6-3.5-9.5-7-11M12 21c.6-6 3.5-9.5 7-11M8.5 21c0-3.5-1-6-3-8M15.5 21c0-3.5 1-6 3-8" /></>,
+  'Water & oever': <><path d="M12 15V4" /><rect x="10.5" y="5.5" width="3" height="6" rx="1.5" /><path d="M3 18c2 0 2-1.5 4.5-1.5S10 18 12 18s2-1.5 4.5-1.5S19 18 21 18M3 21.5c2 0 2-1.5 4.5-1.5s2.5 1.5 4.5 1.5 2-1.5 4.5-1.5 2.5 1.5 4.5 1.5" /></>,
+};
+
+function GroupIcon({ group }: { group: Plant['group'] }) {
+  return <svg viewBox="0 0 24 24" aria-hidden="true" className="gico">{GROUP_ICON[group]}</svg>;
 }
 
 /**
@@ -698,7 +792,8 @@ function joinNl(items: string[], word = 'en') {
 function plantFacts(p: Plant): [string, string][] {
   const facts: [string, string][] = [];
   if (p.light?.length) facts.push(['Standplaats', joinNl(p.light, 'of')]);
-  if (p.soil?.length) facts.push(['Grond', joinNl(p.soil, 'of')]);
+  if (p.grondsoort?.length) facts.push(['Grondsoort', p.grondsoort.length === 4 ? 'alle grondsoorten' : joinNl(p.grondsoort, 'of')]);
+  if (p.soil?.length) facts.push(['Vochtigheid', joinNl(p.soil, 'of')]);
   if (p.height) facts.push(['Hoogte', `${p.height.replace('-', '–')} cm`]);
   if (p.bloom?.length) facts.push(['Bloei', monthRanges(p.bloom)]);
   facts.push(['Snoeien', p.months.length ? monthRanges(p.months) : 'Geen snoei nodig']);
@@ -737,7 +832,7 @@ function PrintPoster({ plants }: { plants: Plant[] }) {
           <li key={p.id}>
             <b>{p.name}</b>{' '}
             <span className="when">{p.months.length ? `snoeien in ${monthRanges(p.months)}` : 'geen snoei nodig'}</span>
-            <p className="pfacts">{plantFacts(p).filter(([k]) => k !== 'Snoeien').map(([k, v]) => `${k}: ${v}.`).join(' ')}</p>
+            <p className="pfacts">{plantFacts(p).filter(([k]) => k !== 'Snoeien' && k !== 'Grondsoort').map(([k, v]) => `${k}: ${v}.`).join(' ')}</p>
             <TipText tip={p.tip} />
           </li>
         ))}
@@ -747,29 +842,39 @@ function PrintPoster({ plants }: { plants: Plant[] }) {
   );
 }
 
-function PlantTip({ p }: { p: Plant }) {
+function PlantTip({ p, month, added, onAdd }: { p: Plant; month: number; added?: boolean; onAdd?: () => void }) {
   return (
     <li className="tip">
       <span className="stripe ok" aria-hidden="true" />
-      <div>
-        <b>{p.name}</b>
+      <div className="tbody">
+        <div className="thead">
+          <b>{p.name}</b>
+          {onAdd && (
+            <button className={`chip small ${added ? 'on' : ''}`} aria-pressed={added} onClick={onAdd}>
+              {added ? '✓ Toegevoegd' : '+ Toevoegen'}
+            </button>
+          )}
+        </div>
         <TipText tip={p.tip} />
+        <MonthBar months={p.months} month={month} />
       </div>
     </li>
   );
 }
 
-/** Een gekozen plant met alle bekende eigenschappen en de tip. */
-function PlantCard({ p }: { p: Plant }) {
+/** Een gekozen plant met alle bekende eigenschappen, de maandbalk en de tip. */
+function PlantCard({ p, month }: { p: Plant; month: number }) {
   return (
     <li className="pcard">
       <div className="pc-head">
+        <GroupIcon group={p.group} />
         <b>{p.name}</b>
         {p.inheems && <InheemsTag />}
       </div>
       {p.latin && <i className="latin">{p.latin}</i>}
+      <MonthBar months={p.months} month={month} />
       <dl className="facts">
-        {plantFacts(p).map(([k, v]) => (
+        {plantFacts(p).filter(([k]) => k !== 'Snoeien').map(([k, v]) => (
           <div key={k}>
             <dt>{k}</dt>
             <dd>{v}</dd>
@@ -781,92 +886,135 @@ function PlantCard({ p }: { p: Plant }) {
   );
 }
 
-function PlantPicker({ mine, setMine }: { mine: string[]; setMine: (ids: string[]) => void }) {
+function PlantChip({ p, on, onClick }: { p: Plant; on: boolean; onClick: () => void }) {
+  return (
+    <button className={`pchip ${on ? 'on' : ''}`} aria-pressed={on} onClick={onClick}>
+      <span className="pc-name">
+        {on ? '✓ ' : '+ '}{p.name}
+        {p.inheems && <InheemsTag />}
+      </span>
+      {p.latin && <i className="latin">{p.latin}</i>}
+    </button>
+  );
+}
+
+/** Keuzeknoppen voor één filter; `null` betekent: niet filteren. */
+function Seg<T extends string>({ label, options, value, set, anyLabel }: {
+  label: string; options: T[]; value: T | null; set: (v: T | null) => void; anyLabel?: string;
+}) {
+  return (
+    <div className="fgroup" role="group" aria-label={label}>
+      <span className="flabel">{label}</span>
+      <div className="seg">
+        {options.map((v) => <button key={v} aria-pressed={value === v} onClick={() => set(value === v && !anyLabel ? null : v)}>{cap(v)}</button>)}
+        {anyLabel && <button aria-pressed={value === null} onClick={() => set(null)}>{anyLabel}</button>}
+      </div>
+    </div>
+  );
+}
+
+function PlantPicker({ mine, toggle }: { mine: string[]; toggle: (id: string) => void }) {
   const [q, setQ] = useState('');
   const [light, setLight] = useState<Licht | null>(null);
+  const [grond, setGrond] = useState<Grondsoort | null>(null);
   const [soil, setSoil] = useState<Grond | null>(null);
   const [onlyNative, setOnlyNative] = useState(false);
+  const [showFilters, setShowFilters] = useState(false);
   const [openGroups, setOpenGroups] = useState<string[]>([]);
+  const input = useRef<HTMLInputElement>(null);
 
   const needle = q.trim().toLowerCase();
-  const filtering = light !== null || soil !== null || onlyNative;
-  const active = needle !== '' || filtering;
-  // Zoeken op Nederlandse én Latijnse naam. Zonder standplaats- of grondgegevens val je weg bij die filters.
+  const nFilters = [light, grond, soil].filter((v) => v !== null).length + (onlyNative ? 1 : 0);
+  const active = needle !== '' || nFilters > 0;
+  // Zoeken op Nederlandse én Latijnse naam. Zonder standplaats- of vochtgegevens val je weg bij die filters.
   const pass = (p: Plant) =>
     (needle === '' || p.name.toLowerCase().includes(needle) || !!p.latin?.toLowerCase().includes(needle)) &&
     (light === null || !!p.light?.includes(light)) &&
+    (grond === null || !!p.grondsoort?.includes(grond)) &&
     (soil === null || !!p.soil?.includes(soil)) &&
     (!onlyNative || !!p.inheems);
   const results = PLANTS.filter(pass);
-  const toggle = (id: string) => setMine(mine.includes(id) ? mine.filter((x) => x !== id) : [...mine, id]);
   const toggleGroup = (g: string) => setOpenGroups((o) => (o.includes(g) ? o.filter((x) => x !== g) : [...o, g]));
-  const clear = () => { setLight(null); setSoil(null); setOnlyNative(false); };
-  const n = results.length;
+  const reset = () => {
+    setQ('');
+    setLight(null);
+    setGrond(null);
+    setSoil(null);
+    setOnlyNative(false);
+    input.current?.focus();
+  };
+  const popular = POPULAR.map((id) => byId.get(id)).filter((p): p is Plant => !!p);
 
   return (
     <div className="picker">
-      <input aria-label="Zoek een plant op Nederlandse of Latijnse naam" placeholder="Zoek op Nederlandse of Latijnse naam…" value={q} onChange={(e) => setQ(e.target.value)} />
-
-      <div className="filters">
-        <div className="fgroup" role="group" aria-label="Standplaats">
-          <span className="flabel">Standplaats</span>
-          <div className="seg">
-            {LIGHTS.map((v) => <button key={v} aria-pressed={light === v} onClick={() => setLight(light === v ? null : v)}>{cap(v)}</button>)}
-          </div>
-        </div>
-        <div className="fgroup" role="group" aria-label="Grond">
-          <span className="flabel">Grond</span>
-          <div className="seg">
-            {SOILS.map((v) => <button key={v} aria-pressed={soil === v} onClick={() => setSoil(soil === v ? null : v)}>{cap(v)}</button>)}
-          </div>
-        </div>
-        <label className="fcheck">
-          <input type="checkbox" checked={onlyNative} onChange={(e) => setOnlyNative(e.target.checked)} />
-          Alleen inheemse planten
-        </label>
+      <div className="search">
+        <svg viewBox="0 0 16 16" aria-hidden="true" className="ico"><circle cx="7" cy="7" r="4.5" /><path d="m10.5 10.5 3.5 3.5" /></svg>
+        <input ref={input} aria-label="Zoek een plant op Nederlandse of Latijnse naam" placeholder="Zoek een plant…" value={q}
+          onChange={(e) => setQ(e.target.value)} onKeyDown={(e) => e.key === 'Escape' && reset()} />
+        {active && (
+          <button className="search-x" aria-label="Zoektekst en filters wissen" title="Zoektekst en filters wissen" onClick={reset}>
+            <svg viewBox="0 0 16 16" aria-hidden="true" className="ico"><path d="m4.5 4.5 7 7m0-7-7 7" /></svg>
+          </button>
+        )}
       </div>
 
-      <p className="fcount" aria-live="polite">
-        {active ? `${n} ${n === 1 ? 'plant' : 'planten'} gevonden.` : `${PLANTS.length} planten in ${GROUPS.length} groepen.`}
-        {(light || soil) && ' Standplaats en grond zijn alleen bekend voor de vaste planten uit de top 100.'}
-        {filtering && <> <button className="linkbtn" onClick={clear}>Filters wissen</button></>}
-      </p>
-      {n === 0 && needle && <p className="muted nohit">Geen plant gevonden met “{q.trim()}”. Je kunt hem hieronder voorstellen.</p>}
+      <button className="ftoggle" aria-expanded={showFilters} aria-controls="filters" onClick={() => setShowFilters(!showFilters)}>
+        Meer filters{nFilters > 0 && <span className="fbadge">{nFilters}</span>}
+        <svg viewBox="0 0 16 16" aria-hidden="true" className="ico chev"><path d="m4 6 4 4 4-4" /></svg>
+      </button>
+      {showFilters && (
+        <div className="filters" id="filters">
+          <Seg label="Standplaats" options={LIGHTS} value={light} set={setLight} />
+          <Seg label="Grondsoort" options={GRONDSOORTEN} value={grond} set={setGrond} anyLabel="Weet ik niet" />
+          <Seg label="Vochtigheid" options={SOILS} value={soil} set={setSoil} />
+          <label className="fcheck">
+            <input type="checkbox" checked={onlyNative} onChange={(e) => setOnlyNative(e.target.checked)} />
+            Alleen inheemse planten
+          </label>
+          {(light || soil) && <p className="muted small fnote">Standplaats en vochtigheid zijn alleen bekend voor de top 100 vaste planten.</p>}
+        </div>
+      )}
 
-      {GROUPS.map((g) => {
-        const all = PLANTS.filter((p) => p.group === g);
-        const list = active ? results.filter((p) => p.group === g) : all;
-        if (list.length === 0) return null;
-        const open = active || openGroups.includes(g);
-        const chosen = all.filter((p) => mine.includes(p.id)).length;
-        const id = `grp-${g.replace(/\W+/g, '-')}`;
-        return (
-          <div key={g} className="pgroup">
-            <button className="grp-head" aria-expanded={open} aria-controls={id} onClick={() => !active && toggleGroup(g)} disabled={active}>
-              <svg viewBox="0 0 16 16" aria-hidden="true" className="ico chev"><path d="m6 4 4 4-4 4" /></svg>
-              <span className="gname">{g}</span>
-              <span className="gcount">
-                {active ? `${list.length} van ${all.length}` : `${all.length} ${all.length === 1 ? 'plant' : 'planten'}`}
-                {chosen > 0 && `, ${chosen} gekozen`}
-              </span>
-            </button>
-            {open && (
-              <div className="chips" id={id}>
-                {list.map((p) => (
-                  <button key={p.id} className={`pchip ${mine.includes(p.id) ? 'on' : ''}`} aria-pressed={mine.includes(p.id)} onClick={() => toggle(p.id)}>
-                    <span className="pc-name">
-                      {mine.includes(p.id) ? '✓ ' : '+ '}{p.name}
-                      {p.inheems && <InheemsTag />}
-                    </span>
-                    {p.latin && <i className="latin">{p.latin}</i>}
-                  </button>
-                ))}
-              </div>
-            )}
+      {!active && (
+        <div className="popular">
+          <h3 className="mlabel">Populair</h3>
+          <div className="chips">
+            {popular.map((p) => <PlantChip key={p.id} p={p} on={mine.includes(p.id)} onClick={() => toggle(p.id)} />)}
           </div>
-        );
-      })}
-      <SuggestPlant initial={n === 0 && needle ? q.trim() : ''} />
+        </div>
+      )}
+
+      {results.length === 0 && <p className="muted nohit">Geen plant gevonden. Je kunt hem hieronder voorstellen.</p>}
+
+      <div className="pgroups">
+        {GROUPS.map((g) => {
+          const all = PLANTS.filter((p) => p.group === g);
+          const list = active ? results.filter((p) => p.group === g) : all;
+          if (list.length === 0) return null;
+          const open = active || openGroups.includes(g);
+          const chosen = all.filter((p) => mine.includes(p.id)).length;
+          const id = `grp-${g.replace(/\W+/g, '-')}`;
+          return (
+            <div key={g} className="pgroup">
+              <button className="grp-head" aria-expanded={open} aria-controls={id} onClick={() => !active && toggleGroup(g)} disabled={active}>
+                <GroupIcon group={g} />
+                <span className="gname">{g}</span>
+                <span className="gcount">
+                  {active ? `${list.length} van ${all.length}` : all.length}
+                  {chosen > 0 && <span className="gchosen">{chosen} gekozen</span>}
+                </span>
+                {!active && <svg viewBox="0 0 16 16" aria-hidden="true" className="ico chev"><path d="m6 4 4 4-4 4" /></svg>}
+              </button>
+              {open && (
+                <div className="chips" id={id}>
+                  {list.map((p) => <PlantChip key={p.id} p={p} on={mine.includes(p.id)} onClick={() => toggle(p.id)} />)}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+      <SuggestPlant initial={results.length === 0 && needle ? q.trim() : ''} />
     </div>
   );
 }

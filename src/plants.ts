@@ -2,10 +2,11 @@
 // months = maanden (1-12) waarin je snoeit ([] = geen snoei nodig); tip = wat en hoe.
 // De lijst PLANTS hieronder voegt drie bronnen samen: de eigen basislijst, de top 100 vaste planten
 // (vasteplanten.ts) en de inheemse planten (inheemseplanten.ts).
+import { GRONDSOORT, type Grondsoort } from './grondsoorten';
 import { INHEEMSE_PLANTEN, OOK_INHEEMS } from './inheemseplanten';
 import { type Grond, type Licht, VASTE_PLANTEN } from './vasteplanten';
 
-export type { Grond, Licht };
+export type { Grond, Grondsoort, Licht };
 
 export const GROUPS = [
   'Heesters',
@@ -27,7 +28,10 @@ export type Plant = {
   tip: string;
   latin?: string;
   light?: Licht[];
+  /** vochtigheid van de grond (uit de top 100 vaste planten) */
   soil?: Grond[];
+  /** grondsoort waarop de plant goed groeit (zie grondsoorten.ts) */
+  grondsoort?: Grondsoort[];
   /** hoogte in cm, bijvoorbeeld "60" of "70-90" */
   height?: string;
   /** bloeimaanden 1-12 */
@@ -103,6 +107,11 @@ export const PLANTS: Plant[] = (() => {
     byId.set(p.id, p);
   }
 
+  for (const p of list) {
+    p.grondsoort = GRONDSOORT[p.id];
+    if (!p.grondsoort && import.meta.env.DEV) console.error(`grondsoorten: "${p.id}" heeft geen grondsoort`);
+  }
+
   for (const id of OOK_INHEEMS) {
     const p = byId.get(id);
     if (p) p.inheems = true;
@@ -136,7 +145,11 @@ export function monthRanges(months: number[]): string {
   return parts.length < 2 ? parts.join('') : `${parts.slice(0, -1).join(', ')} en ${parts[parts.length - 1]}`;
 }
 
+/** Veelgekozen planten, als snelle keuze bovenaan de plantenkiezer. */
+export const POPULAR = ['boerenhortensia', 'rozen', 'lavendel', 'vlinderstruik', 'appel', 'liguster', 'buxus', 'clematis3'];
+
 export const MONTHS = ['jan', 'feb', 'mrt', 'apr', 'mei', 'jun', 'jul', 'aug', 'sep', 'okt', 'nov', 'dec'];
+export const MONTH_LETTERS = ['J', 'F', 'M', 'A', 'M', 'J', 'J', 'A', 'S', 'O', 'N', 'D'];
 export const MONTHS_LONG = ['januari', 'februari', 'maart', 'april', 'mei', 'juni', 'juli', 'augustus', 'september', 'oktober', 'november', 'december'];
 
 /** Maakt een .ics-bestand met een jaarlijks terugkerende herinnering per plant per snoeimaand.
